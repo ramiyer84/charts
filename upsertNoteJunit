@@ -1,0 +1,111 @@
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.*;
+
+import java.sql.*;
+import java.time.LocalDateTime;
+import javax.sql.DataSource;
+
+public class UpsertNoteServiceTests {
+
+    @Mock
+    private DataSource mockDataSource;
+
+    @Mock
+    private Connection mockConnection;
+
+    @Mock
+    private PreparedStatement mockPreparedStatement;
+
+    @Mock
+    private ResultSet mockResultSet;
+
+    @InjectMocks
+    private YourServiceClass service; // Replace with your actual service class
+
+    private Note testNote;
+
+    @BeforeEach
+    void setup() throws Exception {
+        MockitoAnnotations.openMocks(this);
+        when(mockDataSource.getConnection()).thenReturn(mockConnection);
+        when(mockConnection.prepareStatement(anyString())).thenReturn(mockPreparedStatement);
+        testNote = new Note("2023A123456", "Important note", LocalDateTime.now());
+    }
+
+    @Test
+    void shouldInsertPreMigrationNoteIfNoExistingNotes() throws Exception {
+        // Setup risk info
+        ResultSet riskRs = mock(ResultSet.class);
+        when(mockPreparedStatement.executeQuery()).thenReturn(riskRs);
+        when(riskRs.next()).thenReturn(true, true); // once for risk, once for reference
+        when(riskRs.getString(1)).thenReturn("risk123");
+        when(riskRs.getTimestamp(2)).thenReturn(Timestamp.valueOf("2020-01-01 00:00:00"));
+
+        // No existing note in pre-migration
+        ResultSet preNoteRs = mock(ResultSet.class);
+        PreparedStatement preStmt = mock(PreparedStatement.class);
+        when(mockConnection.prepareStatement(contains("FROM Notes n WHERE n.RiskId = ? AND n.AuthorId"))).thenReturn(preStmt);
+        when(preStmt.executeQuery()).thenReturn(preNoteRs);
+        when(preNoteRs.next()).thenReturn(false);
+
+        assertDoesNotThrow(() -> service.upsertNote(testNote, LocalDateTime.now()));
+        verify(mockConnection).commit();
+    }
+
+    @Test
+    void shouldInsertNewPostMigrationNoteIfDifferent() throws Exception {
+        // Risk created after reference
+        ResultSet riskRs = mock(ResultSet.class);
+        when(mockPreparedStatement.executeQuery()).thenReturn(riskRs);
+        when(riskRs.next()).thenReturn(true, true);
+        when(riskRs.getString(1)).thenReturn("risk789");
+        when(riskRs.getTimestamp(2)).thenReturn(Timestamp.valueOf("2023-01-01 00:00:00"));
+
+        // Existing note with different content
+        ResultSet postNoteRs = mock(ResultSet.class);
+        PreparedStatement postStmt = mock(PreparedStatement.class);
+        when(mockConnection.prepareStatement(contains("FROM Notes n WHERE n.RiskId = ?"))).thenReturn(postStmt);
+        when(postStmt.executeQuery()).thenReturn(postNoteRs);
+        when(postNoteRs.next()).thenReturn(true);
+        when(postNoteRs.getString(1)).thenReturn("Some other text");
+
+        assertDoesNotThrow(() -> service.upsertNote(testNote, LocalDateTime.now()));
+        verify(mockConnection).commit();
+    }
+
+    @Test
+    void shouldNotInsertPostMigrationNoteIfSameTextExists() throws Exception {
+        ResultSet riskRs = mock(ResultSet.class);
+        when(mockPreparedStatement.executeQuery()).thenReturn(riskRs);
+        when(riskRs.next()).thenReturn(true, true);
+        when(riskRs.getString(1)).thenReturn("risk999");
+        when(riskRs.getTimestamp(2)).thenReturn(Timestamp.valueOf("2023-01-01 00:00:00"));
+
+        ResultSet postNoteRs = mock(ResultSet.class);
+        PreparedStatement postStmt = mock(PreparedStatement.class);
+        when(mockConnection.prepareStatement(contains("FROM Notes n WHERE n.RiskId = ?"))).thenReturn(postStmt);
+        when(postStmt.executeQuery()).thenReturn(postNoteRs);
+        when(postNoteRs.next()).thenReturn(true);
+        when(postNoteRs.getString(1)).thenReturn("Important note");
+
+        assertDoesNotThrow(() -> service.upsertNote(testNote, LocalDateTime.now()));
+        verify(mockConnection).commit();
+    }
+
+    @Test
+    void shouldThrowExceptionWhenRiskNotFound() throws Exception {
+        ResultSet emptyRs = mock(ResultSet.class);
+        when(mockPreparedStatement.executeQuery()).thenReturn(emptyRs);
+        when(emptyRs.next()).thenReturn(false);
+
+        ServiceException exception = assertThrows(ServiceException.class, () ->
+            service.upsertNote(testNote, LocalDateTime.now()));
+        assertTrue(exception.getMessage().contains("Risk not found"));
+    }
+
+    // Add more edge cases as needed
+}
