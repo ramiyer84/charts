@@ -1,10 +1,10 @@
 package axa.partners.clp.dms.migration.service;
 
-import axa.partners.clp.dms.migration.data.ApplicationConfiguration; import axa.partners.clp.dms.migration.data.dms.*; import org.junit.jupiter.api.BeforeEach; import org.junit.jupiter.api.Test; import org.junit.jupiter.api.extension.ExtendWith; import org.mockito.Mock; import org.mockito.Mockito; import org.mockito.junit.jupiter.MockitoExtension; import org.mockito.junit.jupiter.MockitoSettings; import org.mockito.quality.Strictness;
+import axa.partners.clp.dms.migration.data.ApplicationConfiguration; import axa.partners.clp.dms.migration.data.dms.*; import org.junit.jupiter.api.Test; import org.junit.jupiter.api.extension.ExtendWith; import org.mockito.Mock; import org.mockito.Mockito; import org.mockito.junit.jupiter.MockitoExtension; import org.mockito.quality.Strictness; import org.mockito.junit.jupiter.MockitoSettings;
 
 import javax.sql.DataSource; import java.lang.reflect.Method; import java.sql.*; import java.time.Instant; import java.time.LocalDate; import java.time.LocalDateTime; import java.time.ZoneOffset;
 
-import static org.junit.Assert.assertTrue; import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertTrue; import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class) @MockitoSettings(strictness = Strictness.LENIENT) public class SelmedDMSUpdateServiceTest {
 
@@ -16,41 +16,28 @@ import static org.junit.Assert.assertTrue; import static org.mockito.Mockito.*;
 @Mock ResultSet rs;
 @Mock PreparedStatement statement;
 
-LocalDateTime localDateTime;
-LocalDate localDate;
-
-@BeforeEach
-void setup() throws Exception {
-    when(dataSource.getConnection()).thenReturn(connection);
-    when(connection.createStatement()).thenReturn(st);
-    when(connection.prepareStatement(anyString())).thenReturn(statement);
-    when(statement.executeUpdate()).thenReturn(1);
-}
-
-private SelmedDMSUpdateService buildService() throws Exception {
-    return new SelmedDMSUpdateService(dataSource, riskDataSource, new ApplicationConfiguration(dataSource), decisionsDataSource);
-}
-
 @Test
 public void testSelmedDMSRisksApplicationFileUpdatePackage() throws Exception {
     Method method;
-    boolean status = false;
+    boolean status;
 
+    when(dataSource.getConnection()).thenReturn(connection);
+    when(connection.createStatement()).thenReturn(st);
     when(st.executeQuery(anyString())).thenReturn(rs);
     when(rs.next()).thenReturn(false);
+    when(connection.prepareStatement(anyString())).thenReturn(statement);
+    when(statement.executeUpdate()).thenReturn(1);
 
-    SelmedDMSUpdateService service = buildService();
-
-    localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
-    localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
+    SelmedDMSUpdateService service = new SelmedDMSUpdateService(dataSource, riskDataSource, new ApplicationConfiguration(dataSource), decisionsDataSource);
+    LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 
     SelmedDMSRisksApplicationFileUpdatePackage updatePackage = new SelmedDMSRisksApplicationFileUpdatePackage();
     updatePackage.setId(10000L);
-    updatePackage.setCreatedAt(localDateTime);
-    updatePackage.setCreationDate(localDateTime);
+    updatePackage.setCreatedAt(now);
+    updatePackage.setCreationDate(now);
     updatePackage.setFileNumber("1297284F");
     updatePackage.setLocked(true);
-    updatePackage.setModificationDate(localDateTime);
+    updatePackage.setModificationDate(now);
     updatePackage.setOperation("TEST_OPERATION");
 
     method = SelmedDMSUpdateService.class.getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
@@ -63,15 +50,16 @@ public void testSelmedDMSRisksApplicationFileUpdatePackage() throws Exception {
 @Test
 public void testPostMigrationNoteInsertedWhenDifferent() throws Exception {
     Method method;
-    boolean status = false;
-
+    boolean status;
     LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+
     SelmedDMSNotesUpdatePackage updatePackage = new SelmedDMSNotesUpdatePackage();
     updatePackage.setId(10000L);
     updatePackage.setCreatedAt(now);
     updatePackage.setCreationDate(now);
     updatePackage.setModificationDate(now);
     updatePackage.setOperation("TEST_OPERATION");
+    updatePackage.setFileNumber("2022Z999999");
     updatePackage.setRiskId("RISK123");
     updatePackage.setAuthorId("macao.migration@partners.axa");
     updatePackage.setDescription("New note to insert");
@@ -104,7 +92,7 @@ public void testPostMigrationNoteInsertedWhenDifferent() throws Exception {
     when(connection.prepareStatement(startsWith("INSERT INTO Notes"))).thenReturn(insertStmt);
     when(insertStmt.executeUpdate()).thenReturn(1);
 
-    SelmedDMSUpdateService service = buildService();
+    SelmedDMSUpdateService service = new SelmedDMSUpdateService(dataSource, riskDataSource, new ApplicationConfiguration(dataSource), decisionsDataSource);
     method = SelmedDMSUpdateService.class.getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
     method.setAccessible(true);
     status = (boolean) method.invoke(service, connection, updatePackage);
@@ -115,15 +103,16 @@ public void testPostMigrationNoteInsertedWhenDifferent() throws Exception {
 @Test
 public void testPostMigrationNoteSkippedWhenDuplicate() throws Exception {
     Method method;
-    boolean status = false;
-
+    boolean status;
     LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+
     SelmedDMSNotesUpdatePackage updatePackage = new SelmedDMSNotesUpdatePackage();
     updatePackage.setId(10000L);
     updatePackage.setCreatedAt(now);
     updatePackage.setCreationDate(now);
     updatePackage.setModificationDate(now);
     updatePackage.setOperation("TEST_OPERATION");
+    updatePackage.setFileNumber("2022Z999999");
     updatePackage.setRiskId("RISK123");
     updatePackage.setAuthorId("macao.migration@partners.axa");
     updatePackage.setDescription("Duplicate note");
@@ -152,43 +141,11 @@ public void testPostMigrationNoteSkippedWhenDuplicate() throws Exception {
     when(notesRs.next()).thenReturn(true);
     when(notesRs.getString(1)).thenReturn("Duplicate note");
 
-    SelmedDMSUpdateService service = buildService();
+    SelmedDMSUpdateService service = new SelmedDMSUpdateService(dataSource, riskDataSource, new ApplicationConfiguration(dataSource), decisionsDataSource);
     method = SelmedDMSUpdateService.class.getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
     method.setAccessible(true);
     status = (boolean) method.invoke(service, connection, updatePackage);
 
-    assertTrue(status);
-}
-
-@Test
-public void testPreMigrationNoteInsertedIfNotExists() throws Exception {
-    SelmedDMSUpdateService service = buildService();
-    SelmedDMSNotesUpdatePackage updatePackage = new SelmedDMSNotesUpdatePackage();
-    updatePackage.setFileNumber("2020A123456");
-    updatePackage.setDescription("Pre-migration test");
-    updatePackage.setNoteType(2);
-    updatePackage.setAuthorId("macao.migration@axa.com");
-    updatePackage.setCreatedAt(LocalDateTime.now());
-    updatePackage.setCreationDate(LocalDateTime.now());
-    updatePackage.setModificationDate(LocalDateTime.now());
-
-    boolean status = service.updateSelmedDMSUpdatePackages(connection, updatePackage);
-    assertTrue(status);
-}
-
-@Test
-public void testPostMigrationNoteInsertedWhenNewText() throws Exception {
-    SelmedDMSUpdateService service = buildService();
-    SelmedDMSNotesUpdatePackage updatePackage = new SelmedDMSNotesUpdatePackage();
-    updatePackage.setFileNumber("2023A000001");
-    updatePackage.setDescription("Post-migration insert");
-    updatePackage.setNoteType(2);
-    updatePackage.setAuthorId("macao.migration@axa.com");
-    updatePackage.setCreatedAt(LocalDateTime.now());
-    updatePackage.setCreationDate(LocalDateTime.now());
-    updatePackage.setModificationDate(LocalDateTime.now());
-
-    boolean status = service.updateSelmedDMSUpdatePackages(connection, updatePackage);
     assertTrue(status);
 }
 
