@@ -1,0 +1,170 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'org.springframework.boot' version '3.4.0'
+    id 'io.spring.dependency-management' version '1.1.6'
+    id 'jacoco'
+}
+
+sourceCompatibility = compatibility
+targetCompatibility = compatibility
+
+group = projectGroup
+def env = System.getenv()
+def buildNumberStr = env['BUILD_NUMBER']
+def artifactVersion = baseVersion + (buildNumberStr != null ? "." + buildNumberStr : "-SNAPSHOT")
+version = artifactVersion
+
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+jacocoTestReport {
+    reports {
+        xml.required.set(true)
+    }
+}
+
+jar {
+    archiveBaseName.set(projectName)
+    archiveVersion.set(artifactVersion)
+    manifest {
+        attributes("Implementation-Title": projectGroup + ":" + projectName,
+                   "Implementation-Version": jar.archiveVersion,
+                   "Implementation-Vendor": softwareVendor)
+    }
+}
+
+springBoot {
+    mainClass.set('axa.partners.clp.dms.migration.DMSMigrationService')
+}
+
+
+repositories {
+	mavenLocal()
+	maven {
+        allowInsecureProtocol true
+		url "${nexusUrl}/maven-public/"
+	}
+    mavenCentral()
+}
+
+test {
+    useJUnitPlatform()
+
+    jacoco {
+        excludes = [
+                "src/main/java/**/DMSMigrationsService.*"
+        ]
+    }
+}
+
+sourceSets {
+    'integration-test' {
+        java {
+            compileClasspath += sourceSets.main.output // + test.output
+            runtimeClasspath += sourceSets.main.output // + test.output
+            srcDir file('src/integration-test/java')
+        }
+        resources.srcDir file('src/integration-test/resources')
+    }
+}
+
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntime.extendsFrom testRuntime
+
+    [apiElements, runtimeElements].each {
+        it.outgoing.artifacts.removeIf { it.buildDependencies.getDependencies(null).contains(jar) }
+        it.outgoing.artifact(bootJar)
+    }
+}
+
+task 'integration-test'(type: Test) {
+    useJUnitPlatform()
+    description = 'Runs integration tests.'
+    group = 'verification'
+    testClassesDirs = sourceSets['integration-test'].output.classesDirs
+    classpath = sourceSets['integration-test'].runtimeClasspath
+}
+
+'integration-test' {
+    useJUnitPlatform()
+    group = 'verification'
+    testClassesDirs = sourceSets['integration-test'].output.classesDirs
+    classpath = sourceSets['integration-test'].runtimeClasspath
+    doFirst {
+        def args = [
+        ]
+        if (env['profile'] != null || System.properties['profile'] != null) {
+            args << '-Dprofile=' + (env['profile'] != null ? env['profile'] : System.properties['profile'])
+        }
+        jvmArgs = args
+    }
+}
+
+dependencies {
+    implementation('org.springframework.boot:spring-boot-starter-actuator')
+	implementation('org.springframework.boot:spring-boot-starter-web-services')
+    implementation('org.springframework.boot:spring-boot-starter-data-jdbc')
+    implementation('org.springframework.boot:spring-boot-starter-security')
+    implementation('org.springframework.boot:spring-boot-starter-amqp')
+    implementation('org.springframework.boot:spring-boot-starter-oauth2-resource-server')
+    implementation('io.micrometer:micrometer-registry-prometheus')
+    implementation('software.amazon.awssdk:s3:2.29.21')
+    implementation('org.springdoc:springdoc-openapi-ui:1.8.0')
+    implementation('io.jsonwebtoken:jjwt-api:0.12.6')
+    implementation('io.jsonwebtoken:jjwt-impl:0.12.6')
+    implementation('io.jsonwebtoken:jjwt-jackson:0.12.6')
+    implementation('com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.17.2')
+    implementation('org.apache.httpcomponents.client5:httpclient5:5.4')
+    implementation('org.apache.httpcomponents.core5:httpcore5:5.3.1')
+    implementation('org.apache.httpcomponents.core5:httpcore5-h2:5.3.1')
+    implementation('com.opencsv:opencsv:5.9')
+    implementation('org.yaml:snakeyaml:2.3')
+    implementation('io.kubernetes:client-java:22.0.0')
+    implementation('com.google.protobuf:protobuf-java:4.28.3')
+
+    annotationProcessor('org.springframework.boot:spring-boot-autoconfigure-processor')
+
+    testImplementation('org.testcontainers:testcontainers:1.20.4')
+    testImplementation('org.testcontainers:junit-jupiter:1.20.4')
+    testImplementation('org.testcontainers:postgresql:1.20.4')
+    testImplementation('io.iktech:artifactz-client:1.2.2')
+    testImplementation('software.amazon.awssdk:ecr:2.29.21')
+    testImplementation('com.github.docker-java:docker-java:3.4.0')
+    testImplementation('org.springframework.boot:spring-boot-starter-test')
+
+    runtimeOnly('org.postgresql:postgresql:42.7.4')
+    runtimeOnly('com.microsoft.sqlserver:mssql-jdbc:12.8.1.jre11')
+}
+
+task scan(type:Exec) {
+    dependsOn build
+    println "Scanning ${bootJar.archiveFile.get()} archive"
+    project.mkdir "${rootProject.layout.buildDirectory.get()}/reports/scan/"
+    def f = new File('grype.tmpl')
+    if (!f.exists()) {
+        new URI('http://appsstaging.al.intraxa/dl/grype.tmpl').toURL().withInputStream{ i -> f.withOutputStream{ it << i }}
+    }
+    commandLine 'grype', "${bootJar.archiveFile.get()}", '-f', 'high', '--only-fixed', '--scope', 'all-layers', '-o', 'template', '--file', "${rootProject.layout.buildDirectory.get()}/reports/scan/report.html", '-t', 'grype.tmpl'
+}
+
+task buildLocalImage(type:Exec) {
+    dependsOn build
+    commandLine 'docker', 'build', '--progress', 'plain', '-t', 'dms-migration-service', '--build-arg', 'http_proxy=http://uaclplgapp23.al.intraxa:5300', '--build-arg', "artifact_version=${artifactVersion}", '.'
+}
+
+task buildDebugImage(type:Exec) {
+    dependsOn build
+    commandLine 'docker', 'build', '--progress', 'plain', '--target', 'debug', '-t', 'dms-migration-service', '--build-arg', 'http_proxy=http://uaclplgapp23.al.intraxa:5300', '--build-arg', "artifact_version=${artifactVersion}", '.'
+}
+
+jacocoTestReport.dependsOn test
+
+idea {
+    module {
+        sourceDirs -= file('src/integration-test/java')
+        testSourceDirs += file('src/integration-test/java')
+    }
+}
