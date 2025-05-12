@@ -20,9 +20,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,28 +30,39 @@ public class SelmedDMSUpdateServiceTest {
     @Mock DataSource dataSource;
     @Mock DataSource riskDataSource;
     @Mock DataSource decisionsDataSource;
+
     @Mock Connection connection;
     @Mock Statement st;
-    @Mock ResultSet rs;
     @Mock PreparedStatement statement;
+    @Mock ResultSet rs;
 
-    private SelmedDMSUpdateService service;
-    private LocalDateTime now;
-    private LocalDate     today;
+    LocalDateTime localDateTime;
+    LocalDate localDate;
+
+    SelmedDMSUpdateService service;
 
     @BeforeEach
     void setup() throws Exception {
-        // all three datasources return the same mock Connection
+        // point all three DataSources at the same mock Connection
         when(dataSource.getConnection()).thenReturn(connection);
         when(riskDataSource.getConnection()).thenReturn(connection);
         when(decisionsDataSource.getConnection()).thenReturn(connection);
 
-        // generic stubs for the six original tests
+        // for the six original tests: plain Statement
         when(connection.createStatement()).thenReturn(st);
         when(st.executeQuery(anyString())).thenReturn(rs);
-        when(rs.next()).thenReturn(false);
+
+        // for ANY PreparedStatement we return the same 'statement' mock
         when(connection.prepareStatement(anyString())).thenReturn(statement);
+
+        // every .executeUpdate() on that mock returns 1
         when(statement.executeUpdate()).thenReturn(1);
+
+        // **this** is the crucial line to handle ANY ps.executeQuery() in upsertNote
+        when(statement.executeQuery()).thenReturn(rs);
+
+        // default ResultSet behavior for original tests
+        when(rs.next()).thenReturn(false);
 
         service = new SelmedDMSUpdateService(
             dataSource,
@@ -61,26 +70,24 @@ public class SelmedDMSUpdateServiceTest {
             new ApplicationConfiguration(dataSource),
             decisionsDataSource
         );
-
-        now   = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
-        today = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
     }
 
-    // ---------- original 6 tests ----------
-
+    // --- the six original invoke-updateSelmedDMSUpdatePackages tests ---
     @Test
     public void testSelmedDMSRisksApplicationFileUpdatePackage() throws Exception {
+        localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
         SelmedDMSRisksApplicationFileUpdatePackage pkg = new SelmedDMSRisksApplicationFileUpdatePackage();
         pkg.setId(10000L);
-        pkg.setCreatedAt(now);
-        pkg.setCreationDate(now);
+        pkg.setCreatedAt(localDateTime);
+        pkg.setCreationDate(localDateTime);
         pkg.setFileNumber("1297284F");
         pkg.setLocked(true);
-        pkg.setModificationDate(now);
+        pkg.setModificationDate(localDateTime);
         pkg.setOperation("TEST_OPERATION");
 
         Method m = SelmedDMSUpdateService.class
-            .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
+          .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
         m.setAccessible(true);
         boolean result = (boolean) m.invoke(service, connection, pkg);
 
@@ -89,11 +96,13 @@ public class SelmedDMSUpdateServiceTest {
 
     @Test
     public void testSelmedDMSCoveragesUpdatePackage() throws Exception {
+        localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
         SelmedDMSCoveragesUpdatePackage pkg = new SelmedDMSCoveragesUpdatePackage();
-        pkg.setCreatedAt(now);
-        pkg.setCreationDate(now);
+        pkg.setCreatedAt(localDateTime);
+        pkg.setCreationDate(localDateTime);
         pkg.setFileNumber("1297284F");
-        pkg.setModificationDate(now);
+        pkg.setModificationDate(localDateTime);
         pkg.setOperation("TEST_OPERATION");
         pkg.setAerasCappingApplies(true);
         pkg.setCoverageId("T287248478TDD");
@@ -106,7 +115,7 @@ public class SelmedDMSUpdateServiceTest {
         pkg.setQuota(1.2);
 
         Method m = SelmedDMSUpdateService.class
-            .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
+          .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
         m.setAccessible(true);
         boolean result = (boolean) m.invoke(service, connection, pkg);
 
@@ -115,19 +124,21 @@ public class SelmedDMSUpdateServiceTest {
 
     @Test
     public void testSelmedDMSOptionsUpdatePackage() throws Exception {
+        localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
         SelmedDMSOptionsUpdatePackage pkg = new SelmedDMSOptionsUpdatePackage();
         pkg.setOptionId("9EA01BC1-EACC-4172-6FEE-08D7DC85AD52");
-        pkg.setCreatedAt(now);
-        pkg.setCreationDate(now);
+        pkg.setCreatedAt(localDateTime);
+        pkg.setCreationDate(localDateTime);
         pkg.setFileNumber("1297284F");
-        pkg.setModificationDate(now);
+        pkg.setModificationDate(localDateTime);
         pkg.setOperation("TEST_OPERATION");
         pkg.setAuthorId("NGOSJ");
         pkg.setDescription("OPTIONS");
         pkg.setLoanId(1234L);
 
         Method m = SelmedDMSUpdateService.class
-            .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
+          .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
         m.setAccessible(true);
         boolean result = (boolean) m.invoke(service, connection, pkg);
 
@@ -136,17 +147,19 @@ public class SelmedDMSUpdateServiceTest {
 
     @Test
     public void testSelmedDMSDecisionsApplicationFileUpdatePackage() throws Exception {
+        localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
         SelmedDMSDecisionsApplicationFileUpdatePackage pkg = new SelmedDMSDecisionsApplicationFileUpdatePackage();
         pkg.setId(10000L);
-        pkg.setCreatedAt(now);
-        pkg.setCreationDate(now);
+        pkg.setCreatedAt(localDateTime);
+        pkg.setCreationDate(localDateTime);
         pkg.setFileNumber("1297284F");
-        pkg.setModificationDate(now);
+        pkg.setModificationDate(localDateTime);
         pkg.setOperation("TEST_OPERATION");
         pkg.setHasMedicalRiskSheet(true);
 
         Method m = SelmedDMSUpdateService.class
-            .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
+          .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
         m.setAccessible(true);
         boolean result = (boolean) m.invoke(service, connection, pkg);
 
@@ -155,18 +168,20 @@ public class SelmedDMSUpdateServiceTest {
 
     @Test
     public void testSelmedDMSRisksUpdatePackage() throws Exception {
+        localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
         SelmedDMSRisksUpdatePackage pkg = new SelmedDMSRisksUpdatePackage();
         pkg.setId(10000L);
-        pkg.setCreatedAt(now);
-        pkg.setCreationDate(now);
+        pkg.setCreatedAt(localDateTime);
+        pkg.setCreationDate(localDateTime);
         pkg.setFileNumber("1297284F");
-        pkg.setModificationDate(now);
+        pkg.setModificationDate(localDateTime);
         pkg.setOperation("TEST_OPERATION");
         pkg.setRiskType(2);
         pkg.setRiskId("26736273");
 
         Method m = SelmedDMSUpdateService.class
-            .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
+          .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
         m.setAccessible(true);
         boolean result = (boolean) m.invoke(service, connection, pkg);
 
@@ -175,11 +190,13 @@ public class SelmedDMSUpdateServiceTest {
 
     @Test
     public void testSelmedDMSNotesUpdatePackage() throws Exception {
+        localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
         SelmedDMSNotesUpdatePackage pkg = new SelmedDMSNotesUpdatePackage();
         pkg.setId(10000L);
-        pkg.setCreatedAt(now);
-        pkg.setCreationDate(now);
-        pkg.setModificationDate(now);
+        pkg.setCreatedAt(localDateTime);
+        pkg.setCreationDate(localDateTime);
+        pkg.setModificationDate(localDateTime);
         pkg.setOperation("TEST_OPERATION");
         pkg.setRiskId("26736273");
         pkg.setAuthorId("NGO");
@@ -188,120 +205,110 @@ public class SelmedDMSUpdateServiceTest {
         pkg.setNoteType(2);
 
         Method m = SelmedDMSUpdateService.class
-            .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
+          .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
         m.setAccessible(true);
         boolean result = (boolean) m.invoke(service, connection, pkg);
 
         assertTrue(result);
     }
 
-    // ---------- new upsertNote() tests ----------
+    // --- TWO NEW TESTS FOR upsertNote(...) ---
 
     @Test
     public void testUpsertNote_PreMigration_InsertsNote() throws Exception {
-        // build a notes‐update package
-        SelmedDMSNotesUpdatePackage pkg = new SelmedDMSNotesUpdatePackage();
-        pkg.setFileNumber("FILE123");
-        pkg.setCreationDate(now);
-        pkg.setModificationDate(now);
-        pkg.setOperation("MODIFY");
-        pkg.setRiskId("RISK123");
-        pkg.setAuthorId("macao.migration@partners.axa");
-        pkg.setDescription("pre-migration insert");
-        pkg.setNoteId("noteId1");
-        pkg.setNoteType(2);
+        // create a Note record
+        LocalDateTime now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        Note note = new Note(0L, "FILE123", now, "pre-mig note");
 
-        // 1) risk info lookup returns a timestamp BEFORE the reference date
+        // prepare two separate PreparedStatements for the risk query and the reference query
         PreparedStatement riskStmt = mock(PreparedStatement.class);
         PreparedStatement refStmt  = mock(PreparedStatement.class);
-        when(connection.prepareStatement(contains("FROM Risks r WHERE r.FileNumber = ?")))
-            .thenReturn(riskStmt, refStmt);
+        ResultSet       rsRisk     = mock(ResultSet.class);
+        ResultSet       rsRef      = mock(ResultSet.class);
 
-        ResultSet rsRisk = mock(ResultSet.class);
+        // stub the two calls to connection.prepareStatement(...)
+        when(riskDataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("FROM Risks r WHERE r.FileNumber = ?")))
+          .thenReturn(riskStmt)
+          .thenReturn(refStmt);
+
+        // first executeQuery -> rsRisk
         when(riskStmt.executeQuery()).thenReturn(rsRisk);
         when(rsRisk.next()).thenReturn(true);
-        when(rsRisk.getString(1)).thenReturn("someRiskId");
-        // createdAt = 2023-01-01
-        when(rsRisk.getTimestamp(2)).thenReturn(Timestamp.valueOf("2023-01-01 00:00:00"));
+        when(rsRisk.getString(1)).thenReturn("RID123");
+        Timestamp tooNew = Timestamp.valueOf(now.plusDays(1));
+        when(rsRisk.getTimestamp(2)).thenReturn(tooNew);
 
-        ResultSet rsRef = mock(ResultSet.class);
+        // second executeQuery -> rsRef
         when(refStmt.executeQuery()).thenReturn(rsRef);
         when(rsRef.next()).thenReturn(true);
-        // reference date = 2024-01-01
-        when(rsRef.getTimestamp(1)).thenReturn(Timestamp.valueOf("2024-01-01 00:00:00"));
+        Timestamp older = Timestamp.valueOf(now.minusDays(1));
+        when(rsRef.getTimestamp(1)).thenReturn(older);
 
-        // 2) pre-migration SELECT n.Id... returns no rows
+        // now, in pre-migration we look for existing notes by the migration author
         PreparedStatement preStmt = mock(PreparedStatement.class);
-        when(connection.prepareStatement(contains("FROM Notes n WHERE n.RiskId = ? AND n.AuthorId = ?")))
-            .thenReturn(preStmt);
-        ResultSet rsPre = mock(ResultSet.class);
-        when(preStmt.executeQuery()).thenReturn(rsPre);
-        when(rsPre.next()).thenReturn(false);
+        when(connection.prepareStatement(contains("FROM Notes n WHERE n.RiskId = ? AND n.AuthorId")))
+          .thenReturn(preStmt);
+        when(preStmt.executeQuery()).thenReturn(rs);    // reuse our common rs
+        when(rs.next()).thenReturn(false);              // no existing note
 
-        // 3) INSERT INTO Notes
-        PreparedStatement insertStmt = mock(PreparedStatement.class);
-        when(connection.prepareStatement(startsWith("INSERT INTO Notes"))).thenReturn(insertStmt);
-        when(insertStmt.executeUpdate()).thenReturn(1);
+        // spy so we can verify insertNote(...) and insertNoteHistory(...)
+        SelmedDMSUpdateService spy = spy(service);
+        doNothing().when(spy).insertNote(any(), anyString(), any(), any(), any(), anyString(), anyInt(), anyString());
+        doNothing().when(spy).insertNoteHistory(any(), anyString(), any(), any(), anyString(), anyString(), anyInt());
 
-        Method m = SelmedDMSUpdateService.class
-            .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
-        m.setAccessible(true);
+        // call
+        spy.upsertNote(note, now);
 
-        boolean result = (boolean) m.invoke(service, connection, pkg);
-        assertTrue(result);
+        // verify that we did an insert
+        verify(spy).insertNote(any(), eq("RID123"), any(), eq(now), eq("pre-mig note"), eq("macao.migration@partners.axa"), eq(0), eq("RID123"));
+        verify(spy).insertNoteHistory(any(), anyString(), any(), any(), anyString(), anyString(), anyInt());
     }
 
     @Test
     public void testUpsertNote_PostMigration_InsertsNote() throws Exception {
-        // build a notes‐update package
-        SelmedDMSNotesUpdatePackage pkg = new SelmedDMSNotesUpdatePackage();
-        pkg.setFileNumber("FILE123");
-        pkg.setCreationDate(now);
-        pkg.setModificationDate(now);
-        pkg.setOperation("MODIFY");
-        pkg.setRiskId("RISK123");
-        pkg.setAuthorId("macao.migration@partners.axa");
-        pkg.setDescription("post-migration insert");
-        pkg.setNoteId("noteId2");
-        pkg.setNoteType(2);
+        // create a Note record
+        LocalDateTime now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        Note note = new Note(0L, "FILE123", now, "post-mig note");
 
-        // 1) same risk info / reference lookup as before:
+        // prepare two separate PreparedStatements for the risk and reference queries
         PreparedStatement riskStmt = mock(PreparedStatement.class);
         PreparedStatement refStmt  = mock(PreparedStatement.class);
-        when(connection.prepareStatement(contains("FROM Risks r WHERE r.FileNumber = ?")))
-            .thenReturn(riskStmt, refStmt);
+        ResultSet       rsRisk     = mock(ResultSet.class);
+        ResultSet       rsRef      = mock(ResultSet.class);
 
-        ResultSet rsRisk = mock(ResultSet.class);
+        when(riskDataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("FROM Risks r WHERE r.FileNumber = ?")))
+          .thenReturn(riskStmt)
+          .thenReturn(refStmt);
+
+        // risk info
         when(riskStmt.executeQuery()).thenReturn(rsRisk);
         when(rsRisk.next()).thenReturn(true);
-        when(rsRisk.getString(1)).thenReturn("someRiskId");
-        // createdAt = 2024-01-01
-        when(rsRisk.getTimestamp(2)).thenReturn(Timestamp.valueOf("2024-01-01 00:00:00"));
+        when(rsRisk.getString(1)).thenReturn("RID123");
+        Timestamp tooOld = Timestamp.valueOf(now.minusDays(2));
+        when(rsRisk.getTimestamp(2)).thenReturn(tooOld);
 
-        ResultSet rsRef = mock(ResultSet.class);
+        // reference
         when(refStmt.executeQuery()).thenReturn(rsRef);
         when(rsRef.next()).thenReturn(true);
-        // reference date = 2023-01-01
-        when(rsRef.getTimestamp(1)).thenReturn(Timestamp.valueOf("2023-01-01 00:00:00"));
+        Timestamp evenOlder = Timestamp.valueOf(now.minusDays(10));
+        when(rsRef.getTimestamp(1)).thenReturn(evenOlder);
 
-        // 2) post-migration SELECT n.Description returns no existing match
+        // post-migration SELECT notes
         PreparedStatement postStmt = mock(PreparedStatement.class);
-        when(connection.prepareStatement(contains("SELECT n.Description FROM Notes n WHERE n.RiskId")) )
-            .thenReturn(postStmt);
-        ResultSet rsPost = mock(ResultSet.class);
-        when(postStmt.executeQuery()).thenReturn(rsPost);
-        when(rsPost.next()).thenReturn(false);
+        ResultSet       rsNotes   = mock(ResultSet.class);
+        when(connection.prepareStatement(contains("SELECT n.Description FROM Notes")))
+          .thenReturn(postStmt);
+        when(postStmt.executeQuery()).thenReturn(rsNotes);
+        when(rsNotes.next()).thenReturn(false);  // no duplicate found
 
-        // 3) INSERT INTO Notes
-        PreparedStatement insertStmt = mock(PreparedStatement.class);
-        when(connection.prepareStatement(startsWith("INSERT INTO Notes"))).thenReturn(insertStmt);
-        when(insertStmt.executeUpdate()).thenReturn(1);
+        // spy to catch the insert
+        SelmedDMSUpdateService spy = spy(service);
+        doNothing().when(spy).insertNote(any(), anyString(), any(), any(), anyString(), anyString(), anyInt(), anyString());
 
-        Method m = SelmedDMSUpdateService.class
-            .getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
-        m.setAccessible(true);
+        spy.upsertNote(note, now);
 
-        boolean result = (boolean) m.invoke(service, connection, pkg);
-        assertTrue(result);
+        verify(spy).insertNote(any(), eq("RID123"), any(), eq(now), eq("post-mig note"), eq("macao.migration@partners.axa"), eq(0), eq("RID123"));
     }
 }
