@@ -1,0 +1,110 @@
+public void upsertNote(Note note, LocalDateTime now) throws ServiceException { try (Connection conn = this.risksDataSource.getConnection()) { conn.setAutoCommit(false);
+
+String appNumber = note.applicationNumber();
+    String migrationAuthor = "macao.migration@partners.axa";
+    String referenceAppNumber = "2021A024046"; // reference application used only for cutoff comparison
+
+    try (
+        // Prepare all required SQL statements
+        PreparedStatement stRiskCheck = conn.prepareStatement(
+            "SELECT r.Id, r.CreationDate FROM Risks r WHERE r.FileNumber = ?"
+        );
+        PreparedStatement stRefRiskDate = conn.prepareStatement(
+            "SELECT r.CreationDate FROM Risks r WHERE r.FileNumber = ?"
+        );
+        PreparedStatement stPreMigration = conn.prepareStatement(
+            "SELECT n.Id, n.Description, n.CreationDate, n.AuthorId, n.NoteType " +
+            "FROM Notes n WHERE n.RiskId = ? AND n.AuthorId = ? ORDER BY n.CreationDate"
+        );
+        PreparedStatement stPostMigration = conn.prepareStatement(
+            "SELECT n.Id, n.Description, n.CreationDate, n.AuthorId, n.NoteType " +
+            "FROM Notes n WHERE n.RiskId = ? AND n.AuthorId <> ? ORDER BY n.CreationDate"
+        );
+        PreparedStatement stUpdate = conn.prepareStatement(
+            "UPDATE Notes SET ModificationDate = ?, Description = ? WHERE Id = ?"
+        );
+        PreparedStatement stInsert = conn.prepareStatement(
+            "INSERT INTO Notes (Id, CreationDate, ModificationDate, Description, AuthorId, NoteType, RiskId) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?)"
+        );
+        PreparedStatement stHistory = conn.prepareStatement(
+            "INSERT INTO NoteHistories (Id, CreationDate, ModificationDate, Description, AuthorId, NoteType, NoteId) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?)"
+        )
+    ) {
+        // Step 1: Get the target application's Risk ID and creation date
+        stRiskCheck.setString(1, appNumber);
+        try (ResultSet rsRisk = stRiskCheck.executeQuery()) {
+            if (!rsRisk.next()) {
+                throw new ServiceException("Risk not found for application: " + appNumber);
+            }
+
+            String riskId = rsRisk.getString(1);
+            Timestamp riskCreated = rsRisk.getTimestamp(2);
+
+            // Step 2: Get the reference application's creation date (cutoff)
+            stRefRiskDate.setString(1, referenceAppNumber);
+            try (ResultSet rsRef = stRefRiskDate.executeQuery()) {
+                if (!rsRef.next()) {
+                    throw new ServiceException("Reference application not found: " + referenceAppNumber);
+                }
+
+                Timestamp refCreated = rsRef.getTimestamp(1);
+
+                // Step 3: Only proceed if the target application is newer than the reference
+                if (riskCreated.after(refCreated)) {
+
+                    // Step 4: Try to update an existing pre-migration note for the same Risk
+                    stPreMigration.setString(1, riskId);
+                    stPreMigration.setString(2, migrationAuthor);
+
+                    try (ResultSet rsPre = stPreMigration.executeQuery()) {
+                        if (rsPre.next()) {
+                            String noteId = rsPre.getString(1);
+                            String existingText = rsPre.getString(2);
+
+                            if (noteId != null && !note.note().equals(existingText)) {
+                                updateNote(stUpdate, noteId, now, note.note());
+                                insertNoteHistory(stHistory, noteId, now, rsPre.getTimestamp(3), note.note(), rsPre.getString(4), rsPre.getInt(5));
+                            }
+                        } else {
+                            // Step 5: If no pre-migration note exists, try post-migration flow
+                            handlePostMigration(note, now, stPostMigration, stInsert, riskId, migrationAuthor);
+                        }
+                    }
+                }
+            }
+        }
+
+        DBUtil.commit(conn);
+    }
+} catch (SQLException e) {
+    String msg = String.format("Cannot upsert DMS Risk Note for application '%s': %s", note.applicationNumber(), e.getMessage());
+    logger.error(msg);
+    throw new ServiceException(msg);
+}
+
+}
+
+private void updateNote(PreparedStatement stUpdate, String noteId, LocalDateTime now, String newText) throws SQLException { stUpdate.setTimestamp(1, Timestamp.valueOf(now)); stUpdate.setString(2, newText); stUpdate.setString(3, noteId); stUpdate.executeUpdate(); }
+
+private void insertNote(PreparedStatement stInsert, String noteId, LocalDateTime created, LocalDateTime modified, String text, String authorId, int noteType, String riskId) throws SQLException { stInsert.setString(1, noteId); stInsert.setTimestamp(2, Timestamp.valueOf(created)); stInsert.setTimestamp(3, Timestamp.valueOf(modified)); stInsert.setString(4, text); stInsert.setString(5, authorId); stInsert.setInt(6, noteType); stInsert.setString(7, riskId); stInsert.executeUpdate(); }
+
+private void insertNoteHistory(PreparedStatement stHistory, String noteId, LocalDateTime modified, Timestamp created, String text, String authorId, int noteType) throws SQLException { stHistory.setString(1, UUID.randomUUID().toString()); stHistory.setTimestamp(2, created); stHistory.setTimestamp(3, Timestamp.valueOf(modified)); stHistory.setString(4, text); stHistory.setString(5, authorId); stHistory.setInt(6, noteType); stHistory.setString(7, noteId); stHistory.executeUpdate(); }
+
+private void handlePostMigration(Note note, LocalDateTime now, PreparedStatement stPostMigration, PreparedStatement stInsert, String riskId, String migrationAuthor) throws SQLException { stPostMigration.setString(1, riskId); stPostMigration.setString(2, migrationAuthor);
+
+try (ResultSet rsPost = stPostMigration.executeQuery()) {
+    if (rsPost.next()) {
+        String noteId = rsPost.getString(1);
+        String existingText = rsPost.getString(2);
+
+        if (noteId != null && !note.note().equals(existingText)) {
+            noteId = UUID.randomUUID().toString();
+            insertNote(stInsert, noteId, note.creationDate(), now, note.note(), migrationAuthor, 0, riskId);
+        }
+    }
+}
+
+}
+
