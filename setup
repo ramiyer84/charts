@@ -1,0 +1,24 @@
+@BeforeEach
+void setup() throws Exception {
+    MockitoAnnotations.openMocks(this);
+
+    when(dataSource.getConnection()).thenReturn(connection);
+    when(riskDataSource.getConnection()).thenReturn(connection);
+    when(decisionsDataSource.getConnection()).thenReturn(connection);
+
+    // Support for both parameterized and plain SQL statements
+    when(connection.prepareStatement(anyString())).thenReturn(statement);
+    when(connection.createStatement()).thenReturn(st);
+
+    // ApplicationConfiguration requires connection for initialization
+    when(dataSource.getConnection().createStatement()).thenReturn(st);
+    when(st.executeQuery(anyString())).thenReturn(rs);
+    when(rs.next()).thenReturn(false); // default behavior
+
+    service = new SelmedDMSUpdateService(
+        dataSource,
+        riskDataSource,
+        new ApplicationConfiguration(dataSource),
+        decisionsDataSource
+    );
+}
