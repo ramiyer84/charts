@@ -62,29 +62,27 @@ stPreMigration.setString(1, riskId);
 
 }
 
-private void handlePostMigrationLogic(Connection conn, String riskId, Note note, LocalDateTime now, String migrationAuthor) throws SQLException { try (PreparedStatement stPostMigration = conn.prepareStatement( "SELECT n.Id, n.Description, n.CreationDate, n.AuthorId, n.NoteType " + "FROM Notes n WHERE n.RiskId = ? AND n.AuthorId <> ? ORDER BY n.CreationDate")) {
+private void handlePostMigrationLogic(Connection conn, String riskId, Note note, LocalDateTime now, String migrationAuthor) throws SQLException { try (PreparedStatement stPostMigration = conn.prepareStatement( "SELECT n.Description FROM Notes n WHERE n.RiskId = ? ORDER BY n.CreationDate")) {
 
 stPostMigration.setString(1, riskId);
-    stPostMigration.setString(2, migrationAuthor);
 
+    boolean noteAlreadyExists = false;
     try (ResultSet rs = stPostMigration.executeQuery()) {
-        if (rs.next()) {
-            String noteId = rs.getString(1);
-            String existingText = rs.getString(2);
+        while (rs.next()) {
+            String existingText = rs.getString(1);
+            if (note.note().equals(existingText)) {
+                noteAlreadyExists = true;
+                break;
+            }
+        }
+    }
 
-            if (noteId != null && !note.note().equals(existingText)) {
-                try (PreparedStatement stUpdate = conn.prepareStatement(
-                        "UPDATE Notes SET ModificationDate = ?, Description = ? WHERE Id = ?")) {
-                    updateNote(stUpdate, noteId, now, note.note());
-                }
-            }
-        } else {
-            try (PreparedStatement stInsert = conn.prepareStatement(
-                    "INSERT INTO Notes (Id, CreationDate, ModificationDate, Description, AuthorId, NoteType, RiskId) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
-                String noteId = UUID.randomUUID().toString();
-                insertNote(stInsert, noteId, note.creationDate(), now, note.note(), migrationAuthor, 0, riskId);
-            }
+    if (!noteAlreadyExists) {
+        try (PreparedStatement stInsert = conn.prepareStatement(
+                "INSERT INTO Notes (Id, CreationDate, ModificationDate, Description, AuthorId, NoteType, RiskId) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+            String noteId = UUID.randomUUID().toString();
+            insertNote(stInsert, noteId, note.creationDate(), now, note.note(), migrationAuthor, 0, riskId);
         }
     }
 }
