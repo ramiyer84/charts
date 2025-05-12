@@ -1,111 +1,275 @@
-import static org.mockito.Mockito.*;
-import static org.junit.jupiter.api.Assertions.*;
+package axa.partners.clp.dms.migration.service;
 
-import org.junit.jupiter.api.BeforeEach;
+import axa.partners.clp.dms.migration.data.ApplicationConfiguration;
+import axa.partners.clp.dms.migration.data.dms.*;
 import org.junit.jupiter.api.Test;
-import org.mockito.*;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.sql.*;
-import java.time.LocalDateTime;
 import javax.sql.DataSource;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
-public class UpsertNoteServiceTests {
+import static org.junit.Assert.assertTrue;
 
-    @Mock
-    private DataSource mockDataSource;
+@ExtendWith(MockitoExtension.class)
+public class SelmedDMSUpdateServiceTest {
 
-    @Mock
-    private Connection mockConnection;
+	@Mock
+	DataSource dataSource;
 
-    @Mock
-    private PreparedStatement mockPreparedStatement;
+	@Mock
+	DataSource riskDataSource;
+	
+	@Mock
+	DataSource decisionsDataSource;
+	
+	@Mock
+	Connection connection;
+	
+	@Mock
+	Statement st;
 
-    @Mock
-    private ResultSet mockResultSet;
+	@Mock
+	ResultSet rs;
 
-    @InjectMocks
-    private YourServiceClass service; // Replace with your actual service class
-
-    private Note testNote;
-
-    @BeforeEach
-    void setup() throws Exception {
-        MockitoAnnotations.openMocks(this);
-        when(mockDataSource.getConnection()).thenReturn(mockConnection);
-        when(mockConnection.prepareStatement(anyString())).thenReturn(mockPreparedStatement);
-        testNote = new Note("2023A123456", "Important note", LocalDateTime.now());
-    }
-
-    @Test
-    void shouldInsertPreMigrationNoteIfNoExistingNotes() throws Exception {
-        // Setup risk info
-        ResultSet riskRs = mock(ResultSet.class);
-        when(mockPreparedStatement.executeQuery()).thenReturn(riskRs);
-        when(riskRs.next()).thenReturn(true, true); // once for risk, once for reference
-        when(riskRs.getString(1)).thenReturn("risk123");
-        when(riskRs.getTimestamp(2)).thenReturn(Timestamp.valueOf("2020-01-01 00:00:00"));
-
-        // No existing note in pre-migration
-        ResultSet preNoteRs = mock(ResultSet.class);
-        PreparedStatement preStmt = mock(PreparedStatement.class);
-        when(mockConnection.prepareStatement(contains("FROM Notes n WHERE n.RiskId = ? AND n.AuthorId"))).thenReturn(preStmt);
-        when(preStmt.executeQuery()).thenReturn(preNoteRs);
-        when(preNoteRs.next()).thenReturn(false);
-
-        assertDoesNotThrow(() -> service.upsertNote(testNote, LocalDateTime.now()));
-        verify(mockConnection).commit();
-    }
-
-    @Test
-    void shouldInsertNewPostMigrationNoteIfDifferent() throws Exception {
-        // Risk created after reference
-        ResultSet riskRs = mock(ResultSet.class);
-        when(mockPreparedStatement.executeQuery()).thenReturn(riskRs);
-        when(riskRs.next()).thenReturn(true, true);
-        when(riskRs.getString(1)).thenReturn("risk789");
-        when(riskRs.getTimestamp(2)).thenReturn(Timestamp.valueOf("2023-01-01 00:00:00"));
-
-        // Existing note with different content
-        ResultSet postNoteRs = mock(ResultSet.class);
-        PreparedStatement postStmt = mock(PreparedStatement.class);
-        when(mockConnection.prepareStatement(contains("FROM Notes n WHERE n.RiskId = ?"))).thenReturn(postStmt);
-        when(postStmt.executeQuery()).thenReturn(postNoteRs);
-        when(postNoteRs.next()).thenReturn(true);
-        when(postNoteRs.getString(1)).thenReturn("Some other text");
-
-        assertDoesNotThrow(() -> service.upsertNote(testNote, LocalDateTime.now()));
-        verify(mockConnection).commit();
-    }
-
-    @Test
-    void shouldNotInsertPostMigrationNoteIfSameTextExists() throws Exception {
-        ResultSet riskRs = mock(ResultSet.class);
-        when(mockPreparedStatement.executeQuery()).thenReturn(riskRs);
-        when(riskRs.next()).thenReturn(true, true);
-        when(riskRs.getString(1)).thenReturn("risk999");
-        when(riskRs.getTimestamp(2)).thenReturn(Timestamp.valueOf("2023-01-01 00:00:00"));
-
-        ResultSet postNoteRs = mock(ResultSet.class);
-        PreparedStatement postStmt = mock(PreparedStatement.class);
-        when(mockConnection.prepareStatement(contains("FROM Notes n WHERE n.RiskId = ?"))).thenReturn(postStmt);
-        when(postStmt.executeQuery()).thenReturn(postNoteRs);
-        when(postNoteRs.next()).thenReturn(true);
-        when(postNoteRs.getString(1)).thenReturn("Important note");
-
-        assertDoesNotThrow(() -> service.upsertNote(testNote, LocalDateTime.now()));
-        verify(mockConnection).commit();
-    }
-
-    @Test
-    void shouldThrowExceptionWhenRiskNotFound() throws Exception {
-        ResultSet emptyRs = mock(ResultSet.class);
-        when(mockPreparedStatement.executeQuery()).thenReturn(emptyRs);
-        when(emptyRs.next()).thenReturn(false);
-
-        ServiceException exception = assertThrows(ServiceException.class, () ->
-            service.upsertNote(testNote, LocalDateTime.now()));
-        assertTrue(exception.getMessage().contains("Risk not found"));
-    }
-
-    // Add more edge cases as needed
+	@Mock
+	PreparedStatement statement;
+	
+	LocalDateTime localDateTime;
+	
+	LocalDate localDate;	
+	
+	@Test
+	public void testSelmedDMSRisksApplicationFileUpdatePackage() throws Exception {
+        Method method;
+        boolean status = false;
+		Mockito.when(dataSource.getConnection()).thenReturn(connection);
+		Mockito.when(connection.createStatement()).thenReturn(st);
+		Mockito.when(st.executeQuery(Mockito.anyString())).thenReturn(rs);
+		Mockito.when(rs.next()).thenReturn(false);
+		Mockito.when(connection.prepareStatement(Mockito.anyString())).thenReturn(statement);
+		Mockito.when(statement.executeUpdate()).thenReturn(1);
+		SelmedDMSUpdateService service = new SelmedDMSUpdateService(dataSource, riskDataSource, new ApplicationConfiguration(dataSource), decisionsDataSource);
+		
+		localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
+        
+        SelmedDMSRisksApplicationFileUpdatePackage updatePackage = new SelmedDMSRisksApplicationFileUpdatePackage();
+        updatePackage.setId(10000l);
+        updatePackage.setCreatedAt(localDateTime);
+        updatePackage.setCreationDate(localDateTime);
+        updatePackage.setFileNumber("1297284F");
+        updatePackage.setLocked(true);
+        updatePackage.setModificationDate(localDateTime);
+        updatePackage.setOperation("TEST_OPERATION");
+        
+        try {
+			method = SelmedDMSUpdateService.class.getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
+	        method.setAccessible(true);
+			status = (boolean) method.invoke(service, connection, updatePackage);
+		} catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			System.out.println(e);
+		}
+        
+		assertTrue(status);
+	}
+	
+	@Test
+	public void testSelmedDMSCoveragesUpdatePackage() throws Exception {
+        Method method;
+        boolean status = false;
+		Mockito.when(dataSource.getConnection()).thenReturn(connection);
+		Mockito.when(connection.createStatement()).thenReturn(st);
+		Mockito.when(st.executeQuery(Mockito.anyString())).thenReturn(rs);
+		Mockito.when(rs.next()).thenReturn(false);
+		Mockito.when(connection.prepareStatement(Mockito.anyString())).thenReturn(statement);
+		Mockito.when(statement.executeUpdate()).thenReturn(1);
+		SelmedDMSUpdateService service = new SelmedDMSUpdateService(dataSource, riskDataSource, new ApplicationConfiguration(dataSource), decisionsDataSource);
+		
+		localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
+        
+        SelmedDMSCoveragesUpdatePackage updatePackage = new SelmedDMSCoveragesUpdatePackage();
+        updatePackage.setCreatedAt(localDateTime);
+        updatePackage.setCreationDate(localDateTime);
+        updatePackage.setFileNumber("1297284F");
+        updatePackage.setModificationDate(localDateTime);
+        updatePackage.setOperation("TEST_OPERATION");
+        updatePackage.setAerasCappingApplies(true);
+        updatePackage.setCoverageId("T287248478TDD");
+        updatePackage.setCoverSubmitted(true);
+        updatePackage.setCurrencyCode("EUR");
+        updatePackage.setInsuredAmount(10000l);
+        updatePackage.setLoanId(2378572835l);
+        updatePackage.setMacaoCoverId("testID");
+        updatePackage.setName(1234);
+        updatePackage.setQuota(1.2);
+        
+        try {
+			method = SelmedDMSUpdateService.class.getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
+	        method.setAccessible(true);
+			status = (boolean) method.invoke(service, connection, updatePackage);
+		} catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			System.out.println(e);
+		}
+		
+		assertTrue(status);
+	}
+	
+	@Test
+	public void testSelmedDMSOptionsUpdatePackage() throws Exception {
+        Method method;
+        boolean status = false;
+		Mockito.when(dataSource.getConnection()).thenReturn(connection);
+		Mockito.when(connection.createStatement()).thenReturn(st);
+		Mockito.when(st.executeQuery(Mockito.anyString())).thenReturn(rs);
+		Mockito.when(rs.next()).thenReturn(false);
+		Mockito.when(connection.prepareStatement(Mockito.anyString())).thenReturn(statement);
+		Mockito.when(statement.executeUpdate()).thenReturn(1);
+		SelmedDMSUpdateService service = new SelmedDMSUpdateService(dataSource, riskDataSource, new ApplicationConfiguration(dataSource), decisionsDataSource);
+		
+		localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
+        
+        SelmedDMSOptionsUpdatePackage updatePackage = new SelmedDMSOptionsUpdatePackage();
+        updatePackage.setOptionId("9EA01BC1-EACC-4172-6FEE-08D7DC85AD52");
+        updatePackage.setCreatedAt(localDateTime);
+        updatePackage.setCreationDate(localDateTime);
+        updatePackage.setFileNumber("1297284F");
+        updatePackage.setModificationDate(localDateTime);
+        updatePackage.setOperation("TEST_OPERATION");
+        updatePackage.setAuthorId("NGOSJ");
+        updatePackage.setDescription("OPTIONS");
+        updatePackage.setLoanId(1234l);
+        
+        try {
+			method = SelmedDMSUpdateService.class.getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
+	        method.setAccessible(true);
+			status = (boolean) method.invoke(service, connection, updatePackage);
+		} catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			System.out.println(e);
+		}
+		
+		assertTrue(status);
+	}
+	
+	@Test
+	public void testSelmedDMSDecisionsApplicationFileUpdatePackage() throws Exception {
+        Method method;
+        boolean status = false;
+		Mockito.when(dataSource.getConnection()).thenReturn(connection);
+		Mockito.when(connection.createStatement()).thenReturn(st);
+		Mockito.when(st.executeQuery(Mockito.anyString())).thenReturn(rs);
+		Mockito.when(rs.next()).thenReturn(false);
+		Mockito.when(connection.prepareStatement(Mockito.anyString())).thenReturn(statement);
+		Mockito.when(statement.executeUpdate()).thenReturn(1);
+		SelmedDMSUpdateService service = new SelmedDMSUpdateService(dataSource, riskDataSource, new ApplicationConfiguration(dataSource), decisionsDataSource);
+		
+		localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
+        
+        SelmedDMSDecisionsApplicationFileUpdatePackage updatePackage = new SelmedDMSDecisionsApplicationFileUpdatePackage();
+        updatePackage.setId(10000l);
+        updatePackage.setCreatedAt(localDateTime);
+        updatePackage.setCreationDate(localDateTime);
+        updatePackage.setFileNumber("1297284F");
+        updatePackage.setModificationDate(localDateTime);
+        updatePackage.setOperation("TEST_OPERATION");
+        updatePackage.setHasMedicalRiskSheet(true);
+        
+        try {
+			method = SelmedDMSUpdateService.class.getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
+	        method.setAccessible(true);
+			status = (boolean) method.invoke(service, connection, updatePackage);
+		} catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			System.out.println(e);
+		}
+		
+		assertTrue(status);
+	}
+	
+	
+	@Test
+	public void testSelmedDMSRisksUpdatePackage() throws Exception {
+        Method method;
+        boolean status = false;
+		Mockito.when(dataSource.getConnection()).thenReturn(connection);
+		Mockito.when(connection.createStatement()).thenReturn(st);
+		Mockito.when(st.executeQuery(Mockito.anyString())).thenReturn(rs);
+		Mockito.when(rs.next()).thenReturn(false);
+		Mockito.when(connection.prepareStatement(Mockito.anyString())).thenReturn(statement);
+		Mockito.when(statement.executeUpdate()).thenReturn(1);
+		SelmedDMSUpdateService service = new SelmedDMSUpdateService(dataSource, riskDataSource, new ApplicationConfiguration(dataSource), decisionsDataSource);
+		
+		localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
+        
+        SelmedDMSRisksUpdatePackage updatePackage = new SelmedDMSRisksUpdatePackage();
+        updatePackage.setId(10000l);
+        updatePackage.setCreatedAt(localDateTime);
+        updatePackage.setCreationDate(localDateTime);
+        updatePackage.setFileNumber("1297284F");
+        updatePackage.setModificationDate(localDateTime);
+        updatePackage.setOperation("TEST_OPERATION");
+        updatePackage.setRiskType(2);
+        updatePackage.setRiskId("26736273");
+        
+        try {
+			method = SelmedDMSUpdateService.class.getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
+	        method.setAccessible(true);
+			status = (boolean) method.invoke(service, connection, updatePackage);
+		} catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			System.out.println(e);
+		}
+		
+		assertTrue(status);
+	}
+	
+	@Test
+	public void testSelmedDMSNotesUpdatePackage() throws Exception {
+        Method method;
+        boolean status = false;
+		Mockito.when(dataSource.getConnection()).thenReturn(connection);
+		Mockito.when(connection.createStatement()).thenReturn(st);
+		Mockito.when(st.executeQuery(Mockito.anyString())).thenReturn(rs);
+		Mockito.when(rs.next()).thenReturn(false);
+		Mockito.when(connection.prepareStatement(Mockito.anyString())).thenReturn(statement);
+		Mockito.when(statement.executeUpdate()).thenReturn(1);
+		SelmedDMSUpdateService service = new SelmedDMSUpdateService(dataSource, riskDataSource, new ApplicationConfiguration(dataSource), decisionsDataSource);
+		
+		localDateTime = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        localDate = LocalDate.ofInstant(Instant.now(), ZoneOffset.UTC);
+        
+        SelmedDMSNotesUpdatePackage updatePackage = new SelmedDMSNotesUpdatePackage();
+        updatePackage.setId(10000l);
+        updatePackage.setCreatedAt(localDateTime);
+        updatePackage.setCreationDate(localDateTime);
+        updatePackage.setModificationDate(localDateTime);
+        updatePackage.setOperation("TEST_OPERATION");
+        updatePackage.setRiskId("26736273");
+        updatePackage.setAuthorId("NGO");
+        updatePackage.setDescription("NOTES");
+        updatePackage.setNoteId("123");
+        updatePackage.setNoteType(2);
+        
+		try {
+			method = SelmedDMSUpdateService.class.getDeclaredMethod("updateSelmedDMSUpdatePackages", Connection.class, Entity.class);
+	        method.setAccessible(true);
+			status = (boolean) method.invoke(service, connection, updatePackage);
+		} catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			System.out.println(e);
+		}
+		assertTrue(status);
+	}
 }
