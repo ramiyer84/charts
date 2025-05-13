@@ -1,7 +1,7 @@
 plugins {
     id 'java'
     id 'idea'
-    id 'org.springframework.boot' version '3.4.0'
+    id 'org.springframework.boot' version '3.4.1'            // upgraded Spring Boot → 3.4.1 1
     id 'io.spring.dependency-management' version '1.1.6'
     id 'jacoco'
 }
@@ -29,9 +29,11 @@ jar {
     archiveBaseName.set(projectName)
     archiveVersion.set(artifactVersion)
     manifest {
-        attributes("Implementation-Title": projectGroup + ":" + projectName,
-                   "Implementation-Version": jar.archiveVersion,
-                   "Implementation-Vendor": softwareVendor)
+        attributes(
+            "Implementation-Title": projectGroup + ":" + projectName,
+            "Implementation-Version": jar.archiveVersion,
+            "Implementation-Vendor": softwareVendor
+        )
     }
 }
 
@@ -39,14 +41,20 @@ springBoot {
     mainClass.set('axa.partners.clp.dms.migration.DMSMigrationService')
 }
 
-
 repositories {
-	mavenLocal()
-	maven {
+    mavenLocal()
+    maven {
         allowInsecureProtocol true
-		url "${nexusUrl}/maven-public/"
-	}
+        url "${nexusUrl}/maven-public/"
+    }
     mavenCentral()
+}
+
+dependencyManagement {
+    imports {
+        // Netty BOM at 4.1.119.Final (fixes GHSA-389x-839f-4rhx) 
+        mavenBom "io.netty:netty-bom:4.1.119.Final"               // 
+    }
 }
 
 test {
@@ -54,7 +62,7 @@ test {
 
     jacoco {
         excludes = [
-                "src/main/java/**/DMSMigrationsService.*"
+            "src/main/java/**/DMSMigrationsService.*"
         ]
     }
 }
@@ -62,8 +70,8 @@ test {
 sourceSets {
     'integration-test' {
         java {
-            compileClasspath += sourceSets.main.output // + test.output
-            runtimeClasspath += sourceSets.main.output // + test.output
+            compileClasspath += sourceSets.main.output 
+            runtimeClasspath += sourceSets.main.output
             srcDir file('src/integration-test/java')
         }
         resources.srcDir file('src/integration-test/resources')
@@ -94,10 +102,9 @@ task 'integration-test'(type: Test) {
     testClassesDirs = sourceSets['integration-test'].output.classesDirs
     classpath = sourceSets['integration-test'].runtimeClasspath
     doFirst {
-        def args = [
-        ]
+        def args = []
         if (env['profile'] != null || System.properties['profile'] != null) {
-            args << '-Dprofile=' + (env['profile'] != null ? env['profile'] : System.properties['profile'])
+            args << '-Dprofile=' + (env['profile'] ?: System.properties['profile'])
         }
         jvmArgs = args
     }
@@ -105,7 +112,7 @@ task 'integration-test'(type: Test) {
 
 dependencies {
     implementation('org.springframework.boot:spring-boot-starter-actuator')
-	implementation('org.springframework.boot:spring-boot-starter-web-services')
+    implementation('org.springframework.boot:spring-boot-starter-web-services')
     implementation('org.springframework.boot:spring-boot-starter-data-jdbc')
     implementation('org.springframework.boot:spring-boot-starter-security')
     implementation('org.springframework.boot:spring-boot-starter-amqp')
@@ -117,9 +124,12 @@ dependencies {
     implementation('io.jsonwebtoken:jjwt-impl:0.12.6')
     implementation('io.jsonwebtoken:jjwt-jackson:0.12.6')
     implementation('com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.17.2')
-    implementation('org.apache.httpcomponents.client5:httpclient5:5.4')
-    implementation('org.apache.httpcomponents.core5:httpcore5:5.3.1')
-    implementation('org.apache.httpcomponents.core5:httpcore5-h2:5.3.1')
+
+    // HTTP Components updated to fixed patch levels
+    implementation('org.apache.httpcomponents.client5:httpclient5:5.4.4')     // latest 5.4.x 
+    implementation('org.apache.httpcomponents.core5:httpcore5:5.3.4')         // patched 5.3.4 
+    implementation('org.apache.httpcomponents.core5:httpcore5-h2:5.3.4')      // patched 5.3.4 
+
     implementation('com.opencsv:opencsv:5.9')
     implementation('org.yaml:snakeyaml:2.3')
     implementation('io.kubernetes:client-java:22.0.0')
@@ -139,7 +149,7 @@ dependencies {
     runtimeOnly('com.microsoft.sqlserver:mssql-jdbc:12.8.1.jre11')
 }
 
-task scan(type:Exec) {
+task scan(type: Exec) {
     dependsOn build
     println "Scanning ${bootJar.archiveFile.get()} archive"
     project.mkdir "${rootProject.layout.buildDirectory.get()}/reports/scan/"
@@ -147,17 +157,31 @@ task scan(type:Exec) {
     if (!f.exists()) {
         new URI('http://appsstaging.al.intraxa/dl/grype.tmpl').toURL().withInputStream{ i -> f.withOutputStream{ it << i }}
     }
-    commandLine 'grype', "${bootJar.archiveFile.get()}", '-f', 'high', '--only-fixed', '--scope', 'all-layers', '-o', 'template', '--file', "${rootProject.layout.buildDirectory.get()}/reports/scan/report.html", '-t', 'grype.tmpl'
+    commandLine 'grype',
+        "${bootJar.archiveFile.get()}",
+        '-f', 'high',
+        '--only-fixed',
+        '--scope', 'all-layers',
+        '-o', 'template',
+        '--file', "${rootProject.layout.buildDirectory.get()}/reports/scan/report.html",
+        '-t', 'grype.tmpl'
 }
 
-task buildLocalImage(type:Exec) {
+task buildLocalImage(type: Exec) {
     dependsOn build
-    commandLine 'docker', 'build', '--progress', 'plain', '-t', 'dms-migration-service', '--build-arg', 'http_proxy=http://uaclplgapp23.al.intraxa:5300', '--build-arg', "artifact_version=${artifactVersion}", '.'
+    commandLine 'docker', 'build', '--progress', 'plain',
+                '-t', 'dms-migration-service',
+                '--build-arg', 'http_proxy=http://uaclplgapp23.al.intraxa:5300',
+                '--build-arg', "artifact_version=${artifactVersion}", '.'
 }
 
-task buildDebugImage(type:Exec) {
+task buildDebugImage(type: Exec) {
     dependsOn build
-    commandLine 'docker', 'build', '--progress', 'plain', '--target', 'debug', '-t', 'dms-migration-service', '--build-arg', 'http_proxy=http://uaclplgapp23.al.intraxa:5300', '--build-arg', "artifact_version=${artifactVersion}", '.'
+    commandLine 'docker', 'build', '--progress', 'plain',
+                '--target', 'debug',
+                '-t', 'dms-migration-service',
+                '--build-arg', 'http_proxy=http://uaclplgapp23.al.intraxa:5300',
+                '--build-arg', "artifact_version=${artifactVersion}", '.'
 }
 
 jacocoTestReport.dependsOn test
