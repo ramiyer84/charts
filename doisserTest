@@ -1,0 +1,104 @@
+// place these at the bottom of SelmedDMSUpdateServiceTest, after all your other @Test methods
+
+@Test
+public void testInsertClosingDossierNote_PreMigration_WithExistingMacaoNote() throws Exception {
+    // given
+    LocalDateTime original = LocalDateTime.of(2025, 5, 12, 10, 0);
+    Note note = new Note(123L, "FILE123", original, "pre-mig note");
+    // stub risk info/ref date so isPreMigration(...) == true
+    PreparedStatement riskStmt = mock(PreparedStatement.class);
+    PreparedStatement refStmt  = mock(PreparedStatement.class);
+    ResultSet     rsRisk      = mock(ResultSet.class);
+    ResultSet     rsRef       = mock(ResultSet.class);
+
+    when(riskDataSource.getConnection()).thenReturn(connection);
+    when(connection.prepareStatement(contains("FROM Risks r WHERE r.FileNumber"))).thenReturn(riskStmt, refStmt);
+    when(riskStmt.executeQuery()).thenReturn(rsRisk);
+    when(rsRisk.next()).thenReturn(true);
+    when(rsRisk.getString(1)).thenReturn("RID123");
+    // creation date before the reference
+    when(rsRisk.getTimestamp(2)).thenReturn(Timestamp.valueOf("2023-01-01 00:00:00"));
+
+    when(refStmt.executeQuery()).thenReturn(rsRef);
+    when(rsRef.next()).thenReturn(true);
+    when(rsRef.getTimestamp(1)).thenReturn(Timestamp.valueOf("2024-01-01 00:00:00"));
+
+    // stub existing macao note lookup to return at least one
+    PreparedStatement preStmt = mock(PreparedStatement.class);
+    ResultSet     rsNotes    = mock(ResultSet.class);
+    when(connection.prepareStatement(contains("FROM Notes n WHERE n.RiskId"))).thenReturn(preStmt);
+    when(preStmt.executeQuery()).thenReturn(rsNotes);
+    when(rsNotes.next()).thenReturn(true);
+    // no need to verify update here, we're focused on the closing note insert
+
+    // stub the insertClosingDossierNote() PreparedStatement
+    PreparedStatement closeStmt = mock(PreparedStatement.class);
+    when(connection.prepareStatement(startsWith("INSERT INTO Notes"))).thenReturn(closeStmt);
+
+    SelmedDMSUpdateService service = new SelmedDMSUpdateService(
+        dataSource, riskDataSource, new ApplicationConfiguration(dataSource), decisionsDataSource
+    );
+
+    // when
+    service.upsertNote(note, original);
+
+    // then: capture the values passed into insertClosingDossierNote()
+    ArgumentCaptor<Timestamp> tsCaptor = ArgumentCaptor.forClass(Timestamp.class);
+    // verify that we setTimestamp(2, original+2minutes)
+    verify(closeStmt).setTimestamp(eq(2), tsCaptor.capture());
+    LocalDateTime expectedPlus2 = original.plusMinutes(2);
+    assertEquals(Timestamp.valueOf(expectedPlus2), tsCaptor.getValue());
+    // and that the description is exactly the dossier-closing text
+    verify(closeStmt).setString(eq(4), eq("Dossier cloturé sans demande de conseil"));
+    verify(closeStmt).executeUpdate();
+}
+
+@Test
+public void testInsertClosingDossierNote_PostMigration_NoExistingMacaoNote() throws Exception {
+    // given
+    LocalDateTime original = LocalDateTime.of(2025, 5, 12, 10, 0);
+    Note note = new Note(0L, "FILE123", original, "post-mig note");
+    // stub risk info/ref date so isPreMigration(...) == false
+    PreparedStatement riskStmt = mock(PreparedStatement.class);
+    PreparedStatement refStmt  = mock(PreparedStatement.class);
+    ResultSet     rsRisk      = mock(ResultSet.class);
+    ResultSet     rsRef       = mock(ResultSet.class);
+
+    when(riskDataSource.getConnection()).thenReturn(connection);
+    when(connection.prepareStatement(contains("FROM Risks r WHERE r.FileNumber"))).thenReturn(riskStmt, refStmt);
+    when(riskStmt.executeQuery()).thenReturn(rsRisk);
+    when(rsRisk.next()).thenReturn(true);
+    when(rsRisk.getString(1)).thenReturn("RID123");
+    // creation date after the reference
+    when(rsRisk.getTimestamp(2)).thenReturn(Timestamp.valueOf("2025-01-01 00:00:00"));
+
+    when(refStmt.executeQuery()).thenReturn(rsRef);
+    when(rsRef.next()).thenReturn(true);
+    when(rsRef.getTimestamp(1)).thenReturn(Timestamp.valueOf("2024-01-01 00:00:00"));
+
+    // stub post-migration notes lookup to return NONE
+    PreparedStatement postStmt = mock(PreparedStatement.class);
+    ResultSet     rsNotes     = mock(ResultSet.class);
+    when(connection.prepareStatement(contains("FROM Notes n WHERE n.RiskId"))).thenReturn(postStmt);
+    when(postStmt.executeQuery()).thenReturn(rsNotes);
+    when(rsNotes.next()).thenReturn(false);
+
+    // stub the closing-note insertion
+    PreparedStatement closeStmt = mock(PreparedStatement.class);
+    when(connection.prepareStatement(startsWith("INSERT INTO Notes"))).thenReturn(closeStmt);
+
+    SelmedDMSUpdateService service = new SelmedDMSUpdateService(
+        dataSource, riskDataSource, new ApplicationConfiguration(dataSource), decisionsDataSource
+    );
+
+    // when
+    service.upsertNote(note, original);
+
+    // then: assert we still insert the closing dossier
+    ArgumentCaptor<Timestamp> tsCaptor = ArgumentCaptor.forClass(Timestamp.class);
+    verify(closeStmt).setTimestamp(eq(2), tsCaptor.capture());
+    LocalDateTime expectedPlus2 = original.plusMinutes(2);
+    assertEquals(Timestamp.valueOf(expectedPlus2), tsCaptor.getValue());
+    verify(closeStmt).setString(eq(4), eq("Dossier cloturé sans demande de conseil"));
+    verify(closeStmt).executeUpdate();
+}
