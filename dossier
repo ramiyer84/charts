@@ -1,0 +1,24 @@
+private void insertClosingDossierNote(
+    Connection conn,
+    String riskId,
+    String applicationNumber,
+    LocalDateTime when,
+    String author
+) throws SQLException {
+    try (PreparedStatement ps = conn.prepareStatement(
+            "INSERT INTO Notes "
+          + "(Id, CreationDate, ModificationDate, Description, AuthorId, NoteType, RiskId) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+
+        String id = UUID.randomUUID().toString();
+        ps.setString(1, id);
+        ps.setTimestamp(2, Timestamp.valueOf(when));
+        ps.setTimestamp(3, Timestamp.valueOf(when));
+        ps.setString(4, "Dossier migration complete for application " + applicationNumber);
+        ps.setString(5, author);
+        ps.setInt(6, /* your closing-note type */ 0);
+        ps.setString(7, riskId);
+
+        ps.executeUpdate();
+    }
+}
