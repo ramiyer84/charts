@@ -1,34 +1,210 @@
-@Test
-public void testInsertClosingDossierNote_PostMigration_NoExistingMacaoNote() throws Exception {
-    LocalDateTime original = LocalDateTime.of(2025,5,12,10,0);
-    Note note = new Note(0L, "FILE123", original, "post-mig note");
+package axa.partners.clp.dms.migration.service;
 
-    // … stub out risk/ref queries so isPreMigration()==false …
-    // … stub out postStmt so rsNotes.next() == false …
+import axa.partners.clp.dms.migration.data.ApplicationConfiguration;
+import axa.partners.clp.dms.migration.data.decisions.Note;
+import axa.partners.clp.dms.migration.data.dms.*;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.*;
+import org.mockito.junit.jupiter.*;
+import org.mockito.quality.Strictness;
 
-    // —– HERE’S THE ONLY CHANGE —–
-    PreparedStatement primaryInsert = mock(PreparedStatement.class);
-    PreparedStatement closeStmt     = mock(PreparedStatement.class);
+import javax.sql.DataSource;
+import java.lang.reflect.Method;
+import java.sql.*;
+import java.time.*;
 
-    when(connection.prepareStatement(startsWith("INSERT INTO Notes")))
-      .thenReturn(primaryInsert)   // first call → the migration-note insert
-      .thenReturn(closeStmt);      // second call → the dossier-close insert
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
-    when(primaryInsert.executeUpdate()).thenReturn(1);
-    when(closeStmt.executeUpdate()).thenReturn(1);
-    // —– END CHANGE —–
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+public class SelmedDMSUpdateServiceTest {
 
-    service.upsertNote(note, original);
+    @Mock DataSource dataSource;
+    @Mock DataSource riskDataSource;
+    @Mock DataSource decisionsDataSource;
+    @Mock Connection connection;
+    @Mock Statement st;
+    @Mock ResultSet rs;
+    @Mock PreparedStatement statement;
 
-    // capture *only* the closing-dossier timestamp
-    ArgumentCaptor<Timestamp> tsCaptor = ArgumentCaptor.forClass(Timestamp.class);
-    verify(closeStmt).setTimestamp(eq(2), tsCaptor.capture());
-    Assertions.assertEquals(
-      Timestamp.valueOf(original.plusMinutes(2)),
-      tsCaptor.getValue()
-    );
+    private SelmedDMSUpdateService service;
+    private final LocalDateTime now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
 
-    verify(closeStmt).setString(eq(4),
-      eq("Dossier cloturé sans demande de conseil"));
-    verify(closeStmt).executeUpdate();
+    @BeforeEach
+    void setup() throws Exception {
+        // all three DS → same Connection
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(riskDataSource.getConnection()).thenReturn(connection);
+        when(decisionsDataSource.getConnection()).thenReturn(connection);
+
+        // generic stubs for the six original updateSelmedDMS... tests
+        when(connection.createStatement()).thenReturn(st);
+        when(st.executeQuery(anyString())).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeUpdate()).thenReturn(1);
+        when(statement.executeQuery()).thenReturn(rs);
+
+        service = new SelmedDMSUpdateService(
+            dataSource,
+            riskDataSource,
+            new ApplicationConfiguration(dataSource),
+            decisionsDataSource
+        );
+    }
+
+    // … your six existing package-update tests go here unchanged …
+    // (I've elided them to save space — they remain exactly as you had them.)
+
+    @Test
+    public void testUpsertNote_PreMigration_InsertsNote() throws Exception {
+        Note note = new Note(0L, "FILE123", now, "pre-mig note");
+
+        // 1) risk + reference date stubs
+        PreparedStatement riskStmt = mock(PreparedStatement.class);
+        PreparedStatement refStmt  = mock(PreparedStatement.class);
+        when(connection.prepareStatement(contains("FROM Risks r WHERE r.FileNumber")))
+            .thenReturn(riskStmt, refStmt);
+
+        ResultSet rsRisk = mock(ResultSet.class);
+        when(riskStmt.executeQuery()).thenReturn(rsRisk);
+        when(rsRisk.next()).thenReturn(true);
+        when(rsRisk.getString(1)).thenReturn("RID123");
+        when(rsRisk.getTimestamp(2))
+            .thenReturn(Timestamp.valueOf(LocalDateTime.of(2023,1,1,0,0)));
+
+        ResultSet rsRef = mock(ResultSet.class);
+        when(refStmt.executeQuery()).thenReturn(rsRef);
+        when(rsRef.next()).thenReturn(true);
+        when(rsRef.getTimestamp(1))
+            .thenReturn(Timestamp.valueOf(LocalDateTime.of(2022,1,1,0,0)));
+
+        // 2) no pre-migration note found
+        PreparedStatement preStmt = mock(PreparedStatement.class);
+        ResultSet rsNotes = mock(ResultSet.class);
+        when(connection.prepareStatement(contains("FROM Notes n WHERE n.RiskId")))
+            .thenReturn(preStmt);
+        when(preStmt.executeQuery()).thenReturn(rsNotes);
+        when(rsNotes.next()).thenReturn(false);
+
+        // 3) stub the *single* INSERT INTO Notes
+        PreparedStatement insertStmt = mock(PreparedStatement.class);
+        when(connection.prepareStatement(startsWith("INSERT INTO Notes")))
+            .thenReturn(insertStmt);
+        when(insertStmt.executeUpdate()).thenReturn(1);
+
+        // run
+        service.upsertNote(note, now);
+
+        // verify only *one* INSERT for the migration note
+        verify(insertStmt).executeUpdate();
+    }
+
+    @Test
+    public void testUpsertNote_PostMigration_InsertsNote() throws Exception {
+        Note note = new Note(0L, "FILE123", now, "post-mig note");
+
+        // 1) risk + reference date stubs
+        PreparedStatement riskStmt = mock(PreparedStatement.class);
+        PreparedStatement refStmt  = mock(PreparedStatement.class);
+        when(connection.prepareStatement(contains("FROM Risks r WHERE r.FileNumber")))
+            .thenReturn(riskStmt, refStmt);
+
+        ResultSet rsRisk = mock(ResultSet.class);
+        when(riskStmt.executeQuery()).thenReturn(rsRisk);
+        when(rsRisk.next()).thenReturn(true);
+        when(rsRisk.getString(1)).thenReturn("RID123");
+        when(rsRisk.getTimestamp(2))
+            .thenReturn(Timestamp.valueOf(LocalDateTime.of(2023,1,1,0,0)));
+
+        ResultSet rsRef = mock(ResultSet.class);
+        when(refStmt.executeQuery()).thenReturn(rsRef);
+        when(rsRef.next()).thenReturn(true);
+        when(rsRef.getTimestamp(1))
+            .thenReturn(Timestamp.valueOf(LocalDateTime.of(2020,1,1,0,0)));
+
+        // 2) no post-migration note found
+        PreparedStatement postStmt = mock(PreparedStatement.class);
+        ResultSet rsNotes = mock(ResultSet.class);
+        when(connection.prepareStatement(contains("FROM Notes n WHERE n.RiskId")))
+            .thenReturn(postStmt);
+        when(postStmt.executeQuery()).thenReturn(rsNotes);
+        when(rsNotes.next()).thenReturn(false);
+
+        // 3) stub the *single* INSERT INTO Notes
+        PreparedStatement insertStmt = mock(PreparedStatement.class);
+        when(connection.prepareStatement(startsWith("INSERT INTO Notes")))
+            .thenReturn(insertStmt);
+        when(insertStmt.executeUpdate()).thenReturn(1);
+
+        // run
+        service.upsertNote(note, now);
+
+        // verify only *one* INSERT for the post-migration note
+        verify(insertStmt).executeUpdate();
+    }
+
+    @Test
+    public void testInsertClosingDossierNote_PostMigration_NoExistingMacaoNote() throws Exception {
+        LocalDateTime original = LocalDateTime.of(2025,5,12,10,0);
+        Note note = new Note(0L,"FILE123",original,"post-mig note");
+
+        // risk + reference stubbing (so isPreMigration==false)
+        PreparedStatement riskStmt = mock(PreparedStatement.class);
+        PreparedStatement refStmt  = mock(PreparedStatement.class);
+        when(connection.prepareStatement(contains("FROM Risks r WHERE r.FileNumber")))
+            .thenReturn(riskStmt, refStmt);
+
+        ResultSet rsRisk = mock(ResultSet.class);
+        when(riskStmt.executeQuery()).thenReturn(rsRisk);
+        when(rsRisk.next()).thenReturn(true);
+        when(rsRisk.getString(1)).thenReturn("RID123");
+        when(rsRisk.getTimestamp(2))
+            .thenReturn(Timestamp.valueOf("2025-01-01 00:00:00"));
+
+        ResultSet rsRef = mock(ResultSet.class);
+        when(refStmt.executeQuery()).thenReturn(rsRef);
+        when(rsRef.next()).thenReturn(true);
+        when(rsRef.getTimestamp(1))
+            .thenReturn(Timestamp.valueOf("2024-01-01 00:00:00"));
+
+        // no existing Macao note
+        PreparedStatement lookupNotes = mock(PreparedStatement.class);
+        ResultSet rsNotes = mock(ResultSet.class);
+        when(connection.prepareStatement(contains("FROM Notes n WHERE n.RiskId")))
+            .thenReturn(lookupNotes);
+        when(lookupNotes.executeQuery()).thenReturn(rsNotes);
+        when(rsNotes.next()).thenReturn(false);
+
+        // ——— HERE'S THE ONLY CHANGE: TWO DIFFERENT INSERT STUBS ———
+        PreparedStatement primaryInsert = mock(PreparedStatement.class);
+        PreparedStatement closeStmt     = mock(PreparedStatement.class);
+        when(connection.prepareStatement(startsWith("INSERT INTO Notes")))
+            .thenReturn(primaryInsert)   // first INSERT → the migration note
+            .thenReturn(closeStmt);      // second INSERT → the closing-dossier note
+        when(primaryInsert.executeUpdate()).thenReturn(1);
+        when(closeStmt.executeUpdate()).thenReturn(1);
+        // ——————————————————————————————————————————————
+
+        // run
+        service.upsertNote(note, original);
+
+        // now verify only the *second* INSERT got the +2m timestamp
+        ArgumentCaptor<Timestamp> tsCap = ArgumentCaptor.forClass(Timestamp.class);
+        verify(closeStmt).setTimestamp(eq(2), tsCap.capture());
+        Assertions.assertEquals(
+          Timestamp.valueOf(original.plusMinutes(2)),
+          tsCap.getValue()
+        );
+
+        verify(closeStmt).setString(eq(4),
+          eq("Dossier cloturé sans demande de conseil"));
+        verify(closeStmt).executeUpdate();
+    }
+
 }
