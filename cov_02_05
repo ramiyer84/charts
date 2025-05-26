@@ -1,0 +1,32 @@
+WITH macao_combined AS (
+    SELECT
+        f05.application_number,
+        f05.cover_number,
+        f05.loan_id,
+        f02.gis_aeras_cover
+    FROM fc05_records f05
+    LEFT JOIN fc02_records f02
+        ON f05.application_number = f02.application_number
+        AND f05.cover_number = f02.cover_number
+)
+
+SELECT
+    mc.application_number,
+    mc.cover_number,
+    mc.loan_id,
+    mc.gis_aeras_cover,
+    dms.aeraslevel,
+    CASE 
+        WHEN mc.gis_aeras_cover IS NULL AND dms.aeraslevel IS NOT NULL THEN 'Missing in Macao'
+        WHEN mc.gis_aeras_cover IS NOT NULL AND dms.aeraslevel IS NULL THEN 'Missing in DMS'
+        WHEN mc.gis_aeras_cover IS DISTINCT FROM dms.aeraslevel THEN 'Value Mismatch'
+        ELSE NULL
+    END AS issue_type
+FROM macao_combined mc
+LEFT JOIN staging_dms_coverages dms
+    ON mc.application_number = dms.applicationnumber
+    AND mc.cover_number = dms.covernumber
+WHERE
+    mc.gis_aeras_cover IS NULL OR
+    dms.aeraslevel IS NULL OR
+    mc.gis_aeras_cover IS DISTINCT FROM dms.aeraslevel;
