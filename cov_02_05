@@ -13,7 +13,7 @@ coverages_filtered AS (
     SELECT
         applicationfilefilenumber AS application_number,
         macaocoverid AS cover_number,
-        aeraslevel::TEXT AS aeraslevel
+        aeraslevel
     FROM coverages
     WHERE name = '5'
 )
@@ -27,7 +27,13 @@ SELECT
     CASE 
         WHEN mc.gis_aeras_cover IS NULL AND cf.aeraslevel IS NOT NULL THEN 'Missing in Macao'
         WHEN mc.gis_aeras_cover IS NOT NULL AND cf.aeraslevel IS NULL THEN 'Missing in DMS'
-        WHEN mc.gis_aeras_cover IS DISTINCT FROM cf.aeraslevel THEN 'Value Mismatch'
+        WHEN
+            CASE
+                WHEN mc.gis_aeras_cover ~ '^[0-9]+$'
+                THEN mc.gis_aeras_cover::numeric
+                ELSE NULL
+            END IS DISTINCT FROM cf.aeraslevel
+        THEN 'Value Mismatch'
         ELSE NULL
     END AS issue_type
 FROM macao_combined mc
@@ -35,6 +41,11 @@ LEFT JOIN coverages_filtered cf
     ON mc.application_number = cf.application_number
     AND mc.cover_number = cf.cover_number
 WHERE
-    mc.gis_aeras_cover IS NULL OR
-    cf.aeraslevel IS NULL OR
-    mc.gis_aeras_cover IS DISTINCT FROM cf.aeraslevel;
+    mc.gis_aeras_cover IS NULL
+    OR cf.aeraslevel IS NULL
+    OR
+    CASE
+        WHEN mc.gis_aeras_cover ~ '^[0-9]+$'
+        THEN mc.gis_aeras_cover::numeric
+        ELSE NULL
+    END IS DISTINCT FROM cf.aeraslevel;
