@@ -7,13 +7,13 @@ WITH macao_combined AS (
     FROM fc05_records f05
     LEFT JOIN fc02_records f02
         ON f05.application_number = f02.application_number
-        AND f05.cover_number = f02.cover_number
+        AND f05.loan_id = f02.loan_id
 ),
 coverages_filtered AS (
     SELECT
         applicationfilefilenumber AS application_number,
         macaocoverid AS cover_number,
-        aeraslevel
+        aeraslevel::TEXT AS aeraslevel
     FROM coverages
     WHERE name = '5'
 )
