@@ -1,0 +1,9 @@
+SELECT 
+    f02.*,
+    sl.loan_id AS mrt_loan_id
+FROM fc02_records f02
+JOIN sf_applications sa
+  ON f02.application_number = sa.application_number
+JOIN sf_loans sl
+  ON sa.opportunity_id = sl.application_id
+WHERE f02.gis_aeras_cover IS NOT NULL;
