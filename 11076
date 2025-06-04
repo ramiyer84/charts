@@ -1,45 +1,51 @@
-WITH joined_bridge AS (
+WITH join_bridge AS (
   SELECT
-    c.id AS coverage_id,
-    c.loanid AS mrt_loan_id,
-    dc.macao_cover_id,
-    c.macaocoverid,
-    c.quota,
-    c.insuredamount,
-    c.currencycode,
-    fr.cover_number,
-    fr.insured_amount,
-    fr.currency_code,
-    fr.application_number
+    c.id                   AS coverage_id,
+    c.loanid               AS mrt_loan_id,         -- VARCHAR/CHAR
+    dc.macao_cover_id      AS macao_cover_id,      -- NUMERIC in dms_covers
+    c.macaocoverid         AS macaocoverid,        -- CHAR/VARCHAR
+    c.quota                AS quota_real,          -- REAL
+    c.insuredamount        AS insured_amount_real, -- INTEGER/NUMERIC? (DMS) 
+    c.currencycode         AS currency_code_dms,   -- CHAR/VARCHAR
+    fr.cover_number        AS cover_number,        -- NUMERIC in fc05_records
+    fr.insured_amount      AS insured_amount_num,  -- NUMERIC
+    fr.currency_code       AS currency_code_fc05,  -- VARCHAR
+    fr.application_number  AS application_number   -- VARCHAR
   FROM coverages c
-  JOIN delta.dms_covers dc ON c.loanid = dc.loan_id
-  LEFT JOIN fc05_records fr ON dc.macao_cover_id = fr.cover_number
+  JOIN delta.dms_covers dc
+    ON c.loanid = dc.loan_id
+  LEFT JOIN fc05_records fr
+    ON dc.macao_cover_id = fr.cover_number
 )
 
--- ✅ Records in COVERAGES but not in FC05
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 1) All columns CAST to TEXT on the “ONLY_IN_COVERAGES” side
 SELECT
-  'ONLY_IN_COVERAGES' AS source,
-  mrt_loan_id,
-  macaocoverid AS cover_id,
-  quota,
-  insuredamount,
-  currencycode,
-  NULL::varchar AS application_number
-FROM joined_bridge
+  'ONLY_IN_COVERAGES'                 AS source,
+  mrt_loan_id::TEXT                   AS mrt_loan_id,
+  macaocoverid::TEXT                  AS cover_id,
+  quota_real::TEXT                    AS quota,
+  insured_amount_real::TEXT           AS insured_amount,
+  currency_code_dms::TEXT             AS currency_code,
+  NULL::TEXT                          AS application_number
+FROM join_bridge
 WHERE cover_number IS NULL
 
 UNION ALL
 
--- ✅ Records in FC05 but not in COVERAGES
+-- 2) All columns CAST to TEXT on the “ONLY_IN_FC05” side
 SELECT
-  'ONLY_IN_FC05' AS source,
-  dc.loan_id AS mrt_loan_id,
-  fr.cover_number AS cover_id,
-  fr.insured_amount AS quota,
-  fr.insured_amount,
-  fr.currency_code,
-  fr.application_number
+  'ONLY_IN_FC05'                      AS source,
+  dc.loan_id::TEXT                    AS mrt_loan_id,
+  fr.cover_number::TEXT               AS cover_id,
+  fr.insured_amount::TEXT             AS quota,
+  fr.insured_amount::TEXT             AS insured_amount,
+  fr.currency_code::TEXT              AS currency_code,
+  fr.application_number::TEXT         AS application_number
 FROM fc05_records fr
-LEFT JOIN delta.dms_covers dc ON fr.cover_number = dc.macao_cover_id
-LEFT JOIN coverages c ON c.loanid = dc.loan_id
-WHERE c.id IS NULL;
+LEFT JOIN delta.dms_covers dc
+  ON fr.cover_number = dc.macao_cover_id
+LEFT JOIN coverages c
+  ON c.loanid = dc.loan_id
+WHERE c.id IS NULL
+;
