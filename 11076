@@ -1,0 +1,31 @@
+WITH joined_bridge AS (
+  SELECT
+    c.id AS coverage_id,
+    c.loanid AS mrt_loan_id,
+    dc.macao_cover_id,
+    c.macaocoverid,
+    c.quota,
+    c.insuredamount,
+    c.currencycode,
+    fr.cover_number,
+    fr.insured_amount,
+    fr.currency_code,
+    fr.application_number
+  FROM coverages c
+  JOIN delta.dms_covers dc ON c.loanid = dc.loan_id
+  LEFT JOIN fc05_records fr ON dc.macao_cover_id = fr.cover_number
+)
+
+-- Records in COVERAGES but not in FC05
+SELECT 'ONLY_IN_COVERAGES' AS source, *
+FROM joined_bridge
+WHERE cover_number IS NULL
+
+UNION ALL
+
+-- Records in FC05 but not in COVERAGES
+SELECT 'ONLY_IN_FC05' AS source, fr.*
+FROM fc05_records fr
+LEFT JOIN delta.dms_covers dc ON fr.cover_number = dc.macao_cover_id
+LEFT JOIN coverages c ON c.loanid = dc.loan_id
+WHERE c.id IS NULL;
