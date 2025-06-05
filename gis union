@@ -1,0 +1,211 @@
+WITH 
+-- 1) Identify Macao covers to exclude (where FC02.gis_aeras_cover IN ('1','2','R'))
+macao_excluded AS (
+  SELECT
+    f5.cover_number
+  FROM fc05_records f5
+  JOIN fc02_records f2
+    ON f5.loan_id          = f2.loan_id
+   AND f5.application_number = f2.application_number
+  WHERE
+    f2.gis_aeras_cover IN ('1','2','R')
+),
+
+-- 2) Build “macao_full” = all FC05 ⋈ FC02 data, excluding those cover_numbers
+macao_full AS (
+  SELECT
+    f5.cover_number           AS f5_cover_number,        
+    f5.loan_id                AS f5_loan_id,             
+    f5.application_number     AS f5_application_number,  
+    f5.cover_type             AS f5_cover_type,          
+    f5.insured_amount         AS f5_insured_amount,      
+    f5.currency_code          AS f5_currency_code,       
+    f5.cover_label            AS f5_cover_label,         
+    f5.submitted              AS f5_submitted,           
+
+    f2.loan_number            AS f2_loan_number,         
+    f2.ongoing_amount         AS f2_ongoing_amount,      
+    f2.currency_code          AS f2_currency_code,       
+    f2.gis_aeras_cover        AS f2_gis_aeras_cover,     
+    f2.created_at             AS f2_created_at           
+  FROM fc05_records f5
+  JOIN fc02_records f2
+    ON f5.loan_id          = f2.loan_id
+   AND f5.application_number = f2.application_number
+  WHERE 
+    f5.cover_number NOT IN (SELECT cover_number FROM macao_excluded)
+),
+
+-- 3) Your original “SGP-10070_fc02_records_with_sfl” logic
+sgp_fc02_with_sfl AS (
+  SELECT
+      f02.id                     AS f02_id,
+      f02.file_id                AS f02_file_id,
+      f02.application_number     AS f02_application_number,
+      f02.loan_id                AS f02_loan_id,
+      f02.loan_number            AS f02_loan_number,
+      f02.loan_number_key        AS f02_loan_number_key,
+      f02.rpp                    AS f02_rpp,
+      f02.employee_type_code     AS f02_employee_type_code,
+      f02.adhesion_date          AS f02_adhesion_date,
+      f02.loan_capital_amount    AS f02_loan_capital_amount,
+      f02.loan_duration_months   AS f02_loan_duration_months,
+      f02.insured_capital_rate   AS f02_insured_capital_rate,
+      f02.loan_type              AS f02_loan_type,
+      f02.profession_code        AS f02_profession_code,
+      f02.cff                    AS f02_cff,
+      f02.borrower_status        AS f02_borrower_status,
+      f02.premium_called_rate    AS f02_premium_called_rate,
+      f02.normal_rate            AS f02_normal_rate,
+      f02.overpremium_rate       AS f02_overpremium_rate,
+      f02.loan_ref_number        AS f02_loan_ref_number,
+      f02.currency_code          AS f02_currency_code,
+      f02.cff_loan_number        AS f02_cff_loan_number,
+      f02.product_code           AS f02_product_code,
+      f02.normal_death_rate      AS f02_normal_death_rate,
+      f02.normal_invalidity_rate AS f02_normal_invalidity_rate,
+      f02.overpremium_death_rate AS f02_overpremium_death_rate,
+      f02.overpremium_invalidity_rate AS f02_overpremium_invalidity_rate,
+      f02.gis_aeras_cover        AS f02_gis_aeras_cover,
+      f02.aeras_capping          AS f02_aeras_capping,
+      f02.ongoing_amount         AS f02_ongoing_amount,
+      f02.created_at             AS f02_created_at,
+      sa.id                      AS sf_application_id,
+      sa.application_number      AS sf_application_number,
+      sl.id                      AS sf_loan_id,
+      sl.loan_id                 AS sf_loan_reference
+  FROM fc02_records f02
+  LEFT JOIN sf_applications sa
+    ON f02.application_number = sa.application_number
+  LEFT JOIN sf_loans sl
+    ON sa.opportunity_id = sl.id
+  WHERE
+    f02.application_number IS NOT NULL
+),
+
+-- 4) Build “join_bridge” = DMS coverages JOIN delta.dms_covers LEFT JOIN macao_full,
+--    excluding any DMS rows whose macao_cover_id is in macao_excluded
+join_bridge AS (
+  SELECT
+    c.id                    AS coverage_id,            
+    c.creationdate          AS coverage_creationdate,  
+    c.modificationdate      AS coverage_modificationdt,
+    c.loanid                AS mrt_loan_id,            
+    dc.macao_cover_id       AS macao_cover_number,     
+    c.macaocoverid          AS dms_macaocoverid,      
+    c.name                  AS dms_cover_type_int,    
+    c.quota                 AS dms_quota_real,        
+    c.applicationfilefilenumber AS dms_app_file_no,  
+    c.aerascappingapplies   AS dms_aerascapping,      
+    c.coversubmitted        AS dms_coversubmitted,    
+    c.currencycode          AS dms_currency_code,     
+    c.insuredamount         AS dms_insured_amount,    
+    c.isactivetablevel      AS dms_isactivetablevel,  
+    c.tablevel              AS dms_tablevel_int,      
+
+    mf.f5_cover_number      AS macao_f5_cover_number,  
+    mf.f5_loan_id           AS macao_f5_loan_id,       
+    mf.f5_application_number AS macao_f5_app_number,  
+    mf.f5_cover_type        AS macao_f5_cover_type,    
+    mf.f5_insured_amount    AS macao_f5_insured_amount,
+    mf.f5_currency_code     AS macao_f5_currency_code, 
+    mf.f5_cover_label       AS macao_f5_cover_label,   
+    mf.f5_submitted         AS macao_f5_submitted,     
+    mf.f2_loan_number       AS macao_f2_loan_number,   
+    mf.f2_ongoing_amount    AS macao_f2_ongoing_amount,
+    mf.f2_currency_code     AS macao_f2_currency_code, 
+    mf.f2_gis_aeras_cover   AS macao_f2_gis_aeras_cover,
+    mf.f2_created_at        AS macao_f2_created_at     
+  FROM coverages c
+  JOIN delta.dms_covers dc
+    ON c.loanid = dc.loan_id
+  LEFT JOIN macao_full mf
+    ON dc.macao_cover_id = mf.f5_cover_number
+  WHERE
+    dc.macao_cover_id NOT IN (SELECT cover_number FROM macao_excluded)
+),
+
+-- 5) “only_in_dms” = all join_bridge rows with no Macao match (i.e. macao_f5_cover_number IS NULL)
+only_in_dms AS (
+  SELECT
+    'ONLY_IN_COVERAGES'                    AS source,
+    jb.coverage_id            ::TEXT       AS coverage_id,
+    jb.coverage_creationdate  ::TEXT       AS coverage_creationdate,
+    jb.coverage_modificationdt::TEXT       AS coverage_modificationdt,
+    jb.mrt_loan_id            ::TEXT       AS mrt_loan_id,
+    jb.dms_macaocoverid       ::TEXT       AS dms_macaocoverid,
+    jb.dms_cover_type_int     ::TEXT       AS dms_cover_type_int,
+    jb.dms_quota_real         ::TEXT       AS dms_quota,
+    jb.dms_app_file_no        ::TEXT       AS dms_applicationfilefilenumber,
+    jb.dms_aerascapping       ::TEXT       AS dms_aerascappingapplies,
+    jb.dms_coversubmitted     ::TEXT       AS dms_coversubmitted,
+    jb.dms_currency_code      ::TEXT       AS dms_currency_code,
+    jb.dms_insured_amount     ::TEXT       AS dms_insured_amount,
+    jb.dms_isactivetablevel   ::TEXT       AS dms_isactivetablevel,
+    jb.dms_tablevel_int       ::TEXT       AS dms_tablevel,
+    NULL                      ::TEXT       AS macao_f5_cover_number,
+    NULL                      ::TEXT       AS macao_f5_loan_id,
+    NULL                      ::TEXT       AS macao_f5_app_number,
+    NULL                      ::TEXT       AS macao_f5_cover_type,
+    NULL                      ::TEXT       AS macao_f5_insured_amount,
+    NULL                      ::TEXT       AS macao_f5_currency_code,
+    NULL                      ::TEXT       AS macao_f5_cover_label,
+    NULL                      ::TEXT       AS macao_f5_submitted,
+    NULL                      ::TEXT       AS macao_f2_loan_number,
+    NULL                      ::TEXT       AS macao_f2_ongoing_amount,
+    NULL                      ::TEXT       AS macao_f2_currency_code,
+    NULL                      ::TEXT       AS macao_f2_gis_aeras_cover,
+    NULL                      ::TEXT       AS macao_f2_created_at
+  FROM join_bridge jb
+  WHERE jb.macao_f5_cover_number IS NULL
+),
+
+-- 6) “only_in_macao” = all macao_full rows that have no matching DMS coverages
+only_in_macao AS (
+  SELECT
+    'ONLY_IN_FC05'                         AS source,
+    NULL                      ::TEXT       AS coverage_id,
+    NULL                      ::TEXT       AS coverage_creationdate,
+    NULL                      ::TEXT       AS coverage_modificationdt,
+    NULL                      ::TEXT       AS mrt_loan_id,
+    NULL                      ::TEXT       AS dms_macaocoverid,
+    NULL                      ::TEXT       AS dms_cover_type_int,
+    NULL                      ::TEXT       AS dms_quota,
+    NULL                      ::TEXT       AS dms_applicationfilefilenumber,
+    NULL                      ::TEXT       AS dms_aerascappingapplies,
+    NULL                      ::TEXT       AS dms_coversubmitted,
+    NULL                      ::TEXT       AS dms_currency_code,
+    NULL                      ::TEXT       AS dms_insured_amount,
+    NULL                      ::TEXT       AS dms_isactivetablevel,
+    NULL                      ::TEXT       AS dms_tablevel,
+    mf.f5_cover_number       ::TEXT       AS macao_f5_cover_number,
+    mf.f5_loan_id            ::TEXT       AS macao_f5_loan_id,
+    mf.f5_application_number ::TEXT       AS macao_f5_app_number,
+    mf.f5_cover_type         ::TEXT       AS macao_f5_cover_type,
+    mf.f5_insured_amount     ::TEXT       AS macao_f5_insured_amount,
+    mf.f5_currency_code      ::TEXT       AS macao_f5_currency_code,
+    mf.f5_cover_label        ::TEXT       AS macao_f5_cover_label,
+    mf.f5_submitted          ::TEXT       AS macao_f5_submitted,
+    mf.f2_loan_number        ::TEXT       AS macao_f2_loan_number,
+    mf.f2_ongoing_amount     ::TEXT       AS macao_f2_ongoing_amount,
+    mf.f2_currency_code      ::TEXT       AS macao_f2_currency_code,
+    mf.f2_gis_aeras_cover    ::TEXT       AS macao_f2_gis_aeras_cover,
+    mf.f2_created_at         ::TEXT       AS macao_f2_created_at
+  FROM macao_full mf
+  LEFT JOIN delta.dms_covers dc
+    ON mf.f5_cover_number = dc.macao_cover_id
+  LEFT JOIN coverages c
+    ON dc.loan_id = c.loanid
+   AND c.macaocoverid = mf.f5_cover_number::TEXT
+  WHERE c.id IS NULL
+)
+
+SELECT *
+FROM only_in_dms
+
+UNION ALL
+
+SELECT *
+FROM only_in_macao
+
+ORDER BY source, mrt_loan_id;
