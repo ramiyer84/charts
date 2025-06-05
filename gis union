@@ -26,89 +26,28 @@ WITH
     JOIN fc02_records f2
       ON f5.loan_id            = f2.loan_id
      AND f5.application_number = f2.application_number
-    WHERE f5.cover_number NOT IN (SELECT cover_number FROM macao_excluded)
+    WHERE
+      f5.cover_number NOT IN (SELECT cover_number FROM macao_excluded)
   )
 SELECT
-  c.id                             AS coverage_id,
-  c.creationdate                   AS coverage_creationdate,
-  c.modificationdate               AS coverage_modificationdt,
-  c.loanid                         AS dms_loanid,
-  dc.macao_cover_id                AS linked_macao_cover_number,
-  c.macaocoverid                   AS dms_macaocoverid,
-  c.name                           AS dms_cover_type_int,
-  c.quota                          AS dms_quota_real,
-  c.applicationfilefilenumber      AS dms_applicationfilefilenumber,
-  c.aerascappingapplies            AS dms_aerascappingapplies,
-  c.coversubmitted                 AS dms_coversubmitted,
-  c.currencycode                   AS dms_currency_code,
-  c.insuredamount                  AS dms_insured_amount,
-  c.isactivetablevel               AS dms_isactivetablevel,
-  c.tablevel                       AS dms_tablevel_int
-FROM coverages c
-JOIN delta.dms_covers dc
-  ON c.loanid = dc.loan_id
-LEFT JOIN macao_full mf
-  ON dc.macao_cover_id = mf.f5_cover_number
-WHERE
-  dc.macao_cover_id NOT IN (SELECT cover_number FROM macao_excluded)
-  AND mf.f5_cover_number IS NULL
-ORDER BY c.loanid, c.macaocoverid;
-
-
-
-
-
-
-WITH
-  macao_excluded AS (
-    SELECT f5.cover_number
-    FROM fc05_records f5
-    JOIN fc02_records f2
-      ON f5.loan_id            = f2.loan_id
-     AND f5.application_number = f2.application_number
-    WHERE f2.gis_aeras_cover IN ('1','2','R')
-  ),
-  macao_full AS (
-    SELECT
-      f5.cover_number            AS f5_cover_number,
-      f5.loan_id                 AS f5_loan_id,
-      f5.application_number      AS f5_application_number,
-      f5.cover_type              AS f5_cover_type,
-      f5.insured_amount          AS f5_insured_amount,
-      f5.currency_code           AS f5_currency_code,
-      f5.cover_label             AS f5_cover_label,
-      f5.submitted               AS f5_submitted,
-      f2.loan_number             AS f2_loan_number,
-      f2.ongoing_amount          AS f2_ongoing_amount,
-      f2.currency_code           AS f2_currency_code,
-      f2.gis_aeras_cover         AS f2_gis_aeras_cover,
-      f2.created_at              AS f2_created_at
-    FROM fc05_records f5
-    JOIN fc02_records f2
-      ON f5.loan_id            = f2.loan_id
-     AND f5.application_number = f2.application_number
-    WHERE f5.cover_number NOT IN (SELECT cover_number FROM macao_excluded)
-  )
-SELECT
-  mf.f5_cover_number             AS macao_cover_number,
-  mf.f5_loan_id                  AS macao_loan_id,
-  mf.f5_application_number       AS macao_application_number,
-  mf.f5_cover_type               AS macao_cover_type,
-  mf.f5_insured_amount           AS macao_insured_amount,
-  mf.f5_currency_code            AS macao_currency_code,
-  mf.f5_cover_label              AS macao_cover_label,
-  mf.f5_submitted                AS macao_submitted,
-  mf.f2_loan_number              AS macao_f2_loan_number,
-  mf.f2_ongoing_amount           AS macao_f2_ongoing_amount,
-  mf.f2_currency_code            AS macao_f2_currency_code,
-  mf.f2_gis_aeras_cover          AS macao_f2_gis_aeras_cover,
-  mf.f2_created_at               AS macao_f2_created_at
+  mf.f5_cover_number        AS macao_cover_number,
+  mf.f5_loan_id             AS macao_loan_id,
+  mf.f5_application_number  AS macao_application_number,
+  mf.f5_cover_type          AS macao_cover_type,
+  mf.f5_insured_amount      AS macao_insured_amount,
+  mf.f5_currency_code       AS macao_currency_code,
+  mf.f5_cover_label         AS macao_cover_label,
+  mf.f5_submitted           AS macao_submitted,
+  mf.f2_loan_number         AS macao_f2_loan_number,
+  mf.f2_ongoing_amount      AS macao_f2_ongoing_amount,
+  mf.f2_currency_code       AS macao_f2_currency_code,
+  mf.f2_gis_aeras_cover     AS macao_f2_gis_aeras_cover,
+  mf.f2_created_at          AS macao_f2_created_at
 FROM macao_full mf
-LEFT JOIN delta.dms_covers dc
+JOIN delta.dms_covers dc
   ON mf.f5_cover_number = dc.macao_cover_id
 LEFT JOIN coverages c
   ON dc.loan_id = c.loanid
  AND c.macaocoverid = mf.f5_cover_number::TEXT
-WHERE
-  c.id IS NULL
+WHERE c.id IS NULL
 ORDER BY mf.f5_loan_id, mf.f5_cover_number;
