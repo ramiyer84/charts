@@ -1,0 +1,135 @@
+Here’s a breakdown of what you can do based on the architect Igor’s email and how to reflect that into Jira tickets for tracking, communication, and accountability.
+
+
+---
+
+📌 Objective: Optimise Migration Job Execution Time
+
+✅ Key Actions from Architect’s Email
+
+Based on Igor’s feedback, the optimisation steps can be grouped into environment setup, resource tuning, loader testing, and results analysis.
+
+
+---
+
+📝 Recommended Jira Tickets
+
+1. Ticket: Cleanup and Baseline Preparation
+
+Title: Prepare Migration Environment and Establish Baseline
+Description:
+
+Wipe existing data from PostgreSQL.
+
+Load Macao data “as-is” to establish baseline load time.
+
+Monitor CPU/memory usage using:
+
+watch kubectl -n dms-migration-uat top pod
+
+Record CPU/Memory periodically during load.
+
+Document baseline timings and system metrics.
+
+
+
+---
+
+2. Ticket: Configure Resource Requests and Limits
+
+Title: Configure Resource Requests and Limits for Migration Pods
+Description:
+
+Add 20% buffer to average CPU/memory observed and set:
+
+Kubernetes requests
+
+Kubernetes limits (around 50–100% above request)
+
+
+Modify job deployment manifests accordingly.
+
+Ensure guaranteed resources with minimal external interference.
+
+
+
+---
+
+3. Ticket: Loader Tweaks and Analysis
+
+Title: Tune Loader Parameters and Analyze Impact
+Description:
+
+Modify loader configuration (e.g., GOMAXPROCS) to test with a value of 3.
+
+Rerun migration job and compare metrics/timings.
+
+Document improvements (if any), and decide whether to retain changes.
+
+
+
+---
+
+4. Ticket: Comparative Testing with Additional Resources
+
+Title: Evaluate Performance with Additional Resources
+Description:
+
+Rerun baseline with existing parameters.
+
+Increase pod CPU/memory further and rerun.
+
+Compare results to determine scaling benefits.
+
+Document findings.
+
+
+
+---
+
+5. Ticket: Loader-Specific Comparative Testing
+
+Title: Compare Performance Across Different Loaders
+Description:
+
+Test other loaders individually with same dataset.
+
+Record resource usage and time taken.
+
+Identify best-performing loader.
+
+Optionally, combine improvements from multiple runs.
+
+
+
+---
+
+6. Ticket: Finalise Optimised Configuration for Production
+
+Title: Finalise and Document Optimised Migration Strategy
+Description:
+
+Based on findings from earlier tickets, finalise the best configuration.
+
+Create deployment template for production usage (with smaller cluster in mind).
+
+Add rollback/monitoring plan in case optimisations impact production.
+
+
+
+---
+
+🧩 Additional Suggestions
+
+Link these tickets under an Epic (e.g., “Migration Job Performance Tuning”).
+
+Use labels like migration, performance, optimisation, k8s, postgres.
+
+Attach test results (CPU/mem snapshots, load timings, etc.) to relevant tickets for transparency.
+
+
+
+---
+
+Would you like help drafting the exact Jira ticket descriptions in your company’s style (e.g., using a specific template)?
+
