@@ -1,0 +1,7 @@
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$logFile = "C:\Users\$env:USERNAME\Desktop\pod_metrics_$timestamp.txt"
+
+while ($true) {
+    kubectl -n dms-migration-uat top pod | Out-File -FilePath $logFile -Append
+    Start-Sleep -Seconds 30
+}
