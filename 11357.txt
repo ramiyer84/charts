@@ -1,0 +1,158 @@
+Perfect — let's finalize a manual workflow that strictly follows your JIRA ticket's requirements and acceptance criteria, assuming:
+
+You will run the steps manually.
+
+Data is extracted from PostgreSQL.
+
+Data is loaded into SQL Server (MIG_DMSDECISIONS).
+
+No Python or automation tools are available.
+
+You will use CSV files as the bridge between the two systems.
+
+
+
+---
+
+✅ FINALIZED PLAN (Manual Execution – Two Databases)
+
+
+---
+
+⚙️ Step 1: Main Data Extract – PostgreSQL
+
+Run this in PostgreSQL (via pgAdmin or psql) to export the main extract to CSV.
+
+\COPY (
+    SELECT
+        sfa.application_number,
+        sf.macao_loan_id,
+        sf.sfloan_id,
+        rpp.rpp,
+        rpp."Level AERAS RPP migration",
+        CASE
+            WHEN rpp."Level AERAS RPP migration" = 'Niveau 3' THEN 3
+            WHEN rpp."Level AERAS RPP migration" = 'Niveau 2' THEN 2
+            WHEN rpp."Level AERAS RPP migration" = 'Niveau 1' THEN 1
+            ELSE 1
+        END AS dms_aeras_level
+    FROM
+        delta.sf_applications sfa
+    JOIN
+        delta.sf_loans sf ON sf.application_id = sfa.application_id
+    LEFT JOIN
+        temp.rpp rpp ON sf.scheme_name = rpp.rpp
+    WHERE
+        sf.sfloan_id IS NOT NULL
+    ORDER BY
+        sf.sfloan_id
+) TO '/your/path/MRT_AerasLevelSync_20250709.csv' WITH CSV HEADER;
+
+✅ This satisfies:
+
+BR1: Field logic including DMS Aeras Level
+
+BR3: Export CSV MRT_AerasLevelSync_<rundatetime>.csv
+
+BR6: Repeatable extract
+
+
+
+---
+
+⚙️ Step 2: Error Log Extract – PostgreSQL
+
+Run this separately to export records with missing sfloan_id.
+
+\COPY (
+    SELECT
+        sfa.application_number,
+        sf.macao_loan_id,
+        sf.sfloan_id,
+        rpp.rpp,
+        rpp."Level AERAS RPP migration"
+    FROM
+        delta.sf_applications sfa
+    JOIN
+        delta.sf_loans sf ON sf.application_id = sfa.application_id
+    LEFT JOIN
+        temp.rpp rpp ON sf.scheme_name = rpp.rpp
+    WHERE
+        sf.sfloan_id IS NULL
+) TO '/your/path/AerasLevelExtract_Error_Log_20250709.csv' WITH CSV HEADER;
+
+✅ This satisfies:
+
+BR4: Exclude missing SF Loan ID from main extract
+
+BR5: Error log file AerasLevelExtract_Error_Log_<rundatetime>.csv
+
+
+
+---
+
+⚙️ Step 3: Manual Import into SQL Server Table
+
+After copying the CSVs to the SQL Server host:
+
+(A) Truncate existing temp table (optional):
+
+TRUNCATE TABLE MIG_DMSDECISIONS.sch_MIG_DMSDECISIONS.temp_AERAS_lvl;
+
+(B) Import CSV into temp table:
+
+BULK INSERT MIG_DMSDECISIONS.sch_MIG_DMSDECISIONS.temp_AERAS_lvl
+FROM 'C:\your\path\MRT_AerasLevelSync_20250709.csv'
+WITH (
+    FIRSTROW = 2,
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '\n',
+    FORMAT = 'CSV',
+    TABLOCK
+);
+
+> ✅ This satisfies BR2: Load data into temp table in MIG_DMSDECISIONS
+
+
+
+
+---
+
+✅ Summary of File Outputs
+
+File Name	Description	Source
+
+MRT_AerasLevelSync_<date>.csv	Main extract with all required fields	PostgreSQL
+AerasLevelExtract_Error_Log_<date>.csv	Only rows where sfloan_id is missing	PostgreSQL
+
+
+
+---
+
+✅ Summary of Queries Delivered
+
+1. ✔ Main extract query (sfloan_id IS NOT NULL)
+
+
+2. ✔ Error log query (sfloan_id IS NULL)
+
+
+3. ✔ Optional: TRUNCATE TABLE in SQL Server
+
+
+4. ✔ BULK INSERT to load into temp table
+
+
+
+
+---
+
+Let me know if you’d like:
+
+Example CREATE TABLE for the SQL Server destination?
+
+Ready-made CSV headers for the two files?
+
+
+All set otherwise!
+
