@@ -1,0 +1,63 @@
+You can send this back to the architect:
+
+> I see, thanks! Just to confirm — if I define a Deployment that launches a pod with alpine or busybox image and contains tools like nc, I can then kubectl exec into it and test the MSSQL connection. Could you confirm if I should clean it up afterwards or keep it around for future testing?
+
+
+
+Then…
+
+
+---
+
+🛠️ Sample Deployment YAML for Debug Pod
+
+Here’s a basic deployment you can use:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: net-debug
+  labels:
+    app: net-debug
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: net-debug
+  template:
+    metadata:
+      labels:
+        app: net-debug
+    spec:
+      containers:
+        - name: net-debug
+          image: alpine
+          command: ["/bin/sh"]
+          args: ["-c", "sleep 36000"]  # Keeps the pod alive
+
+> You can save this as net-debug.yaml and apply it with:
+
+
+
+kubectl apply -f net-debug.yaml
+
+Then you can do:
+
+kubectl exec -it deploy/net-debug -- sh
+apk add --no-cache netcat-openbsd
+nc -vz <mssql-host> 1433
+
+
+---
+
+🔁 Cleanup Later:
+
+To delete it afterward:
+
+kubectl delete -f net-debug.yaml
+
+
+---
+
+Let me know if you want the image to include curl, telnet, or a shell with more tooling (curlimages/curl or debian etc.).
+
