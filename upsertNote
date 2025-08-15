@@ -1,99 +1,565 @@
-public void upsertNote(Note note, LocalDateTime now) throws ServiceException { try (Connection conn = this.risksDataSource.getConnection()) { conn.setAutoCommit(false);
+Connecting to https://github.axa.com/api/v3 using github/****** (github.axa.com-access)
+Obtained Jenkinsfile-calculateDelta from 927a31379901e04aa4e9e0338c55aeab1644ac6a
+[Pipeline] Start of Pipeline
+Did you forget the `def` keyword? WorkflowScript seems to be setting a field named version (to a value of type String) which could lead to memory leaks or other issues.
+Did you forget the `def` keyword? WorkflowScript seems to be setting a field named image (to a value of type String) which could lead to memory leaks or other issues.
+Did you forget the `def` keyword? WorkflowScript seems to be setting a field named promoted (to a value of type Boolean) which could lead to memory leaks or other issues.
+Did you forget the `def` keyword? WorkflowScript seems to be setting a field named PROJECT_NAME (to a value of type String) which could lead to memory leaks or other issues.
+Did you forget the `def` keyword? WorkflowScript seems to be setting a field named dockerRegistry (to a value of type String) which could lead to memory leaks or other issues.
+Did you forget the `def` keyword? WorkflowScript seems to be setting a field named repository (to a value of type GStringImpl) which could lead to memory leaks or other issues.
+[Pipeline] podTemplate
+[Pipeline] {
+[Pipeline] node
+Created Pod: kubernetes jenkins/dms-covers-pod-q9p48-wltcm
+[PodInfo] jenkins/dms-covers-pod-q9p48-wltcm
+	Container [buildkit] waiting [ContainerCreating] No message
+	Container [jnlp] waiting [ContainerCreating] No message
+	Container [sonarqube] waiting [ContainerCreating] No message
+	Pod [Pending][ContainersNotReady] containers with unready status: [buildkit sonarqube jnlp]
+[PodInfo] jenkins/dms-covers-pod-q9p48-wltcm
+	Container [buildkit] waiting [ContainerCreating] No message
+	Container [jnlp] waiting [ContainerCreating] No message
+	Container [sonarqube] waiting [ContainerCreating] No message
+	Pod [Pending][ContainersNotReady] containers with unready status: [buildkit sonarqube jnlp]
+Agent dms-covers-pod-q9p48-wltcm is provisioned from template dms-covers-pod-q9p48
+---
+apiVersion: "v1"
+kind: "Pod"
+metadata:
+  annotations:
+    kubernetes.jenkins.io/last-refresh: "1755264637294"
+    buildUrl: "http://uaclplgapp26.al.intraxa:8080/jenkins/job/dms-migration/job/post-migration-delta-calculation/job/master/48/"
+    runUrl: "job/dms-migration/job/post-migration-delta-calculation/job/master/48/"
+  labels:
+    jenkins: "slave"
+    jenkins/label-digest: "19b370012c6685fa96207f7180179298694bf30d"
+    jenkins/label: "dms-covers-pod"
+    kubernetes.jenkins.io/controller: "http___uaclplgapp26_al_intraxa_8080_jenkinsx"
+  name: "dms-covers-pod-q9p48-wltcm"
+  namespace: "jenkins"
+spec:
+  containers:
+  - env:
+    - name: "NO_PROXY"
+      value: "localhost,al.intraxa"
+    - name: "HTTPS_PROXY"
+      value: "http://uaclplgapp27.al.intraxa:8080"
+    - name: "HTTP_PROXY"
+      value: "http://uaclplgapp27.al.intraxa:8080"
+    image: "clpregistrystaging.al.intraxa/buildkit"
+    imagePullPolicy: "IfNotPresent"
+    name: "buildkit"
+    resources: {}
+    securityContext:
+      privileged: true
+    tty: true
+    volumeMounts:
+    - mountPath: "/opt/sonar-scanner/conf"
+      name: "volume-3"
+      readOnly: false
+    - mountPath: "/etc/git"
+      name: "volume-4"
+      readOnly: false
+    - mountPath: "/etc/.secret"
+      name: "volume-1"
+      readOnly: false
+    - mountPath: "/root/docker-tls-certs"
+      name: "volume-0"
+      readOnly: false
+    - mountPath: "/etc/.docker"
+      name: "volume-2"
+      readOnly: false
+    - mountPath: "/home/jenkins/agent"
+      name: "workspace-volume"
+      readOnly: false
+  - command:
+    - "cat"
+    image: "iktech/sonarqube-scanner:11-4.2.0"
+    imagePullPolicy: "IfNotPresent"
+    name: "sonarqube"
+    resources: {}
+    tty: true
+    volumeMounts:
+    - mountPath: "/opt/sonar-scanner/conf"
+      name: "volume-3"
+      readOnly: false
+    - mountPath: "/etc/git"
+      name: "volume-4"
+      readOnly: false
+    - mountPath: "/etc/.secret"
+      name: "volume-1"
+      readOnly: false
+    - mountPath: "/root/docker-tls-certs"
+      name: "volume-0"
+      readOnly: false
+    - mountPath: "/etc/.docker"
+      name: "volume-2"
+      readOnly: false
+    - mountPath: "/home/jenkins/agent"
+      name: "workspace-volume"
+      readOnly: false
+  - env:
+    - name: "JENKINS_SECRET"
+      value: "********"
+    - name: "JENKINS_TUNNEL"
+      value: "uaclplgapp26.al.intraxa:50000"
+    - name: "JENKINS_AGENT_NAME"
+      value: "dms-covers-pod-q9p48-wltcm"
+    - name: "REMOTING_OPTS"
+      value: "-noReconnectAfter 1d"
+    - name: "JENKINS_NAME"
+      value: "dms-covers-pod-q9p48-wltcm"
+    - name: "JENKINS_AGENT_WORKDIR"
+      value: "/home/jenkins/agent"
+    - name: "JENKINS_URL"
+      value: "http://uaclplgapp26.al.intraxa:8080/jenkins/"
+    image: "jenkins/inbound-agent:3283.v92c105e0f819-9"
+    name: "jnlp"
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+    volumeMounts:
+    - mountPath: "/opt/sonar-scanner/conf"
+      name: "volume-3"
+      readOnly: false
+    - mountPath: "/etc/git"
+      name: "volume-4"
+      readOnly: false
+    - mountPath: "/etc/.secret"
+      name: "volume-1"
+      readOnly: false
+    - mountPath: "/root/docker-tls-certs"
+      name: "volume-0"
+      readOnly: false
+    - mountPath: "/etc/.docker"
+      name: "volume-2"
+      readOnly: false
+    - mountPath: "/home/jenkins/agent"
+      name: "workspace-volume"
+      readOnly: false
+  nodeSelector:
+    kubernetes.io/os: "linux"
+  restartPolicy: "Never"
+  serviceAccountName: "jenkins"
+  volumes:
+  - name: "volume-0"
+    secret:
+      secretName: "docker-tls-certs"
+  - name: "volume-2"
+    secret:
+      secretName: "docker-config"
+  - name: "volume-1"
+    secret:
+      secretName: "ssh-home"
+  - emptyDir:
+      medium: ""
+    name: "workspace-volume"
+  - name: "volume-4"
+    secret:
+      secretName: "git-config"
+  - name: "volume-3"
+    secret:
+      secretName: "sonar-scanner.properties"
 
-String appNumber = note.applicationNumber();
-    String migrationAuthor = "macao.migration@partners.axa";
-    String referenceAppNumber = "2021A024046";
+Running on dms-covers-pod-q9p48-wltcm in /home/jenkins/agent/workspace/gration-delta-calculation_master
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Prepare)
+[Pipeline] checkout
+Selected Git installation does not exist. Using Default
+The recommended git tool is: NONE
+using credential github.axa.com-access
+Cloning the remote Git repository
+Cloning with configured refspecs honoured and without tags
+Cloning repository https://github.axa.com/axa-partners-clp/dms-migration-post-migration-delta-calculation.git
+ > git init /home/jenkins/agent/workspace/gration-delta-calculation_master # timeout=10
+Fetching upstream changes from https://github.axa.com/axa-partners-clp/dms-migration-post-migration-delta-calculation.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.39.5'
+using GIT_ASKPASS to set credentials github.axa.com-access
+ > git fetch --no-tags --force --progress -- https://github.axa.com/axa-partners-clp/dms-migration-post-migration-delta-calculation.git +refs/heads/master:refs/remotes/origin/master # timeout=10
+Avoid second fetch
+Checking out Revision 927a31379901e04aa4e9e0338c55aeab1644ac6a (master)
+ > git config remote.origin.url https://github.axa.com/axa-partners-clp/dms-migration-post-migration-delta-calculation.git # timeout=10
+ > git config --add remote.origin.fetch +refs/heads/master:refs/remotes/origin/master # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 927a31379901e04aa4e9e0338c55aeab1644ac6a # timeout=10
+Commit message: "Merge pull request #5 from axa-partners-clp/SGP-11726"
+ > git rev-list --no-walk 927a31379901e04aa4e9e0338c55aeab1644ac6a # timeout=10
+Did you forget the `def` keyword? WorkflowScript seems to be setting a field named version (to a value of type String) which could lead to memory leaks or other issues.
+Did you forget the `def` keyword? WorkflowScript seems to be setting a field named image (to a value of type GStringImpl) which could lead to memory leaks or other issues.
+[Pipeline] sh
++ mkdir -p /home/jenkins/.ssh
++ chmod 700 /home/jenkins/.ssh
++ cat /etc/.secret/id_rsa
+[Pipeline] sh
++ chmod 400 /home/jenkins/.ssh/id_rsa
+[Pipeline] sh
++ mkdir -p /home/jenkins/.kube
++ cat /etc/.secret/config
+[Pipeline] sh
++ touch /home/jenkins/.ssh/known_hosts
++ cat /etc/.secret/master-signature
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] container
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Build Image)
+[Pipeline] sh
++ mkdir /root/.docker
++ mkdir -p /root/.ssh
++ chmod 700 /root/.ssh
++ cat /etc/.secret/id_rsa
++ cp /etc/.docker/config.json /root/.docker/
++ cp /etc/git/.gitconfig /root/.gitconfig
++ cp /etc/.secret/id_rsa ./id_rsa
++ cp /etc/git/.gitconfig ./.gitconfig
++ buildctl build --frontend dockerfile.v0 --local 'context=.' --local 'dockerfile=.' --opt 'target=calculate-delta' --export-cache 'type=local,dest=/tmp/buildkit/cache' --output 'type=oci,dest=/tmp/image.tar' --opt 'network=host' --opt 'build-arg:version=1.0.0.48' --opt 'build-arg:http_proxy=http://uaclplgapp27.al.intraxa:8080' --opt 'build-arg:no_proxy=localhost,al.intraxa,github.axa.com'
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 4.32kB done
+#1 DONE 0.0s
 
-    RiskInfo riskInfo = getRiskInfoForApplication(appNumber, conn);
-    Timestamp refCreated = getReferenceCreationDate(referenceAppNumber, conn);
+#2 [internal] load metadata for docker.io/library/golang:1.24.5
+#2 DONE 1.6s
 
-    if (isPreMigration(riskInfo.creationDate(), refCreated)) {
-        handlePreMigrationLogic(conn, riskInfo.riskId(), note, now, migrationAuthor);
-    } else {
-        handlePostMigrationLogic(conn, riskInfo.riskId(), note, now, migrationAuthor);
-    }
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
 
-    DBUtil.commit(conn);
-} catch (SQLException e) {
-    String msg = String.format("Cannot upsert DMS Risk Note for application '%s': %s", note.applicationNumber(), e.getMessage());
-    logger.error(msg);
-    throw new ServiceException(msg);
-}
+#4 [src  1/11] FROM docker.io/library/golang:1.24.5@sha256:ef5b4be1f94b36c90385abd9b6b4f201723ae28e71acacb76d00687333c17282
+#4 resolve docker.io/library/golang:1.24.5@sha256:ef5b4be1f94b36c90385abd9b6b4f201723ae28e71acacb76d00687333c17282 0.0s done
+#4 DONE 0.2s
 
-}
+#5 [src  4/11] ADD http://uaclplgapp23.al.intraxa/dl/AXA-PROXY-ROOT-CA.crt /usr/local/share/ca-certificates/AXA-PROXY-ROOT-CA.crt
+#5 DONE 0.1s
 
-private RiskInfo getRiskInfoForApplication(String appNumber, Connection conn) throws SQLException, ServiceException { try (PreparedStatement ps = conn.prepareStatement("SELECT r.Id, r.CreationDate FROM Risks r WHERE r.FileNumber = ?")) { ps.setString(1, appNumber); try (ResultSet rs = ps.executeQuery()) { if (!rs.next()) { throw new ServiceException("Risk not found for application: " + appNumber); } return new RiskInfo(rs.getString(1), rs.getTimestamp(2)); } } }
+#6 [internal] load build context
+#6 transferring context: 287.35kB 0.1s done
+#6 DONE 0.1s
 
-private Timestamp getReferenceCreationDate(String referenceAppNumber, Connection conn) throws SQLException, ServiceException { try (PreparedStatement ps = conn.prepareStatement("SELECT r.CreationDate FROM Risks r WHERE r.FileNumber = ?")) { ps.setString(1, referenceAppNumber); try (ResultSet rs = ps.executeQuery()) { if (!rs.next()) { throw new ServiceException("Reference application not found: " + referenceAppNumber); } return rs.getTimestamp(1); } } }
+#7 [src  5/11] ADD http://uaclplgapp23.al.intraxa/dl/katello-server-ca.pem /usr/local/share/ca-certificates/katello-server-ca.pem
+#7 DONE 0.1s
 
-private boolean isPreMigration(Timestamp targetCreated, Timestamp referenceCreated) { return !targetCreated.after(referenceCreated); }
+#4 [src  1/11] FROM docker.io/library/golang:1.24.5@sha256:ef5b4be1f94b36c90385abd9b6b4f201723ae28e71acacb76d00687333c17282
+#4 sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 0B / 32B 0.2s
+#4 sha256:85db7d6e6763f6a466c21994a684dc9102dd0390585b0e07b2259a397e9fc0f0 0B / 126B 0.2s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 0B / 78.99MB 0.2s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 0B / 92.35MB 0.2s
+#4 sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 32B / 32B 0.3s done
+#4 sha256:85db7d6e6763f6a466c21994a684dc9102dd0390585b0e07b2259a397e9fc0f0 126B / 126B 0.4s done
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 0B / 64.40MB 0.2s
+#4 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 0B / 24.02MB 0.2s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 5.24MB / 92.35MB 0.9s
+#4 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 2.10MB / 24.02MB 0.6s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 6.29MB / 78.99MB 1.2s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 4.19MB / 64.40MB 0.9s
+#4 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 4.19MB / 24.02MB 0.8s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 11.53MB / 92.35MB 1.4s
+#4 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 6.29MB / 24.02MB 0.9s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 10.49MB / 78.99MB 1.7s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 8.39MB / 64.40MB 1.4s
+#4 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 9.44MB / 24.02MB 1.4s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 16.78MB / 92.35MB 1.8s
+#4 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 13.63MB / 24.02MB 1.7s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 16.78MB / 78.99MB 2.3s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 12.58MB / 64.40MB 1.8s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 22.02MB / 92.35MB 2.3s
+#4 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 15.73MB / 24.02MB 2.0s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 20.97MB / 78.99MB 2.7s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 16.78MB / 64.40MB 2.3s
+#4 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 18.87MB / 24.02MB 2.1s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 27.26MB / 92.35MB 2.9s
+#4 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 20.97MB / 24.02MB 2.4s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 22.02MB / 64.40MB 2.7s
+#4 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 24.02MB / 24.02MB 2.7s
+#4 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 24.02MB / 24.02MB 2.7s done
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 25.17MB / 78.99MB 3.5s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 0B / 48.49MB 0.2s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 33.55MB / 92.35MB 3.5s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 27.26MB / 64.40MB 3.2s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 29.36MB / 78.99MB 3.9s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 31.46MB / 64.40MB 3.6s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 4.19MB / 48.49MB 0.8s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 39.85MB / 92.35MB 4.1s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 33.55MB / 78.99MB 4.4s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 35.65MB / 64.40MB 4.1s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 7.34MB / 48.49MB 1.2s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 37.75MB / 78.99MB 4.8s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 46.14MB / 92.35MB 4.7s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 12.49MB / 48.49MB 1.5s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 39.85MB / 64.40MB 4.5s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 15.73MB / 48.49MB 1.8s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 41.94MB / 78.99MB 5.3s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 52.43MB / 92.35MB 5.3s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 45.09MB / 64.40MB 5.0s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 19.92MB / 48.49MB 2.1s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 47.19MB / 78.99MB 5.9s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 58.72MB / 92.35MB 5.7s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 49.28MB / 64.40MB 5.4s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 24.12MB / 48.49MB 2.6s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 27.26MB / 48.49MB 2.9s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 53.48MB / 64.40MB 5.9s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 52.43MB / 78.99MB 6.5s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 63.96MB / 92.35MB 6.6s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 58.72MB / 64.40MB 6.3s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 30.41MB / 48.49MB 3.5s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 33.55MB / 48.49MB 3.6s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 69.21MB / 92.35MB 6.9s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 36.70MB / 48.49MB 3.8s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 56.62MB / 78.99MB 7.2s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 62.91MB / 64.40MB 6.9s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 74.45MB / 92.35MB 7.4s
+#4 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 64.40MB / 64.40MB 7.1s done
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 39.85MB / 48.49MB 4.2s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 60.82MB / 78.99MB 7.8s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 80.74MB / 92.35MB 8.0s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 42.99MB / 48.49MB 4.8s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 65.01MB / 78.99MB 8.3s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 46.14MB / 48.49MB 5.1s
+#4 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 48.49MB / 48.49MB 5.3s done
+#4 extracting sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 69.21MB / 78.99MB 8.7s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 85.98MB / 92.35MB 8.7s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 73.40MB / 78.99MB 9.2s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 91.23MB / 92.35MB 9.0s
+#4 sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 92.35MB / 92.35MB 9.2s done
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 77.59MB / 78.99MB 9.6s
+#4 sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 78.99MB / 78.99MB 9.7s done
+#4 extracting sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 4.5s done
+#4 extracting sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a
+#4 extracting sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 3.1s done
+#4 DONE 16.3s
 
-private void handlePreMigrationLogic(Connection conn, String riskId, Note note, LocalDateTime now, String migrationAuthor) throws SQLException { try (PreparedStatement stPreMigration = conn.prepareStatement( "SELECT n.Id, n.Description, n.CreationDate, n.AuthorId, n.NoteType " + "FROM Notes n WHERE n.RiskId = ? AND n.AuthorId = ? ORDER BY n.CreationDate")) {
+#4 [src  1/11] FROM docker.io/library/golang:1.24.5@sha256:ef5b4be1f94b36c90385abd9b6b4f201723ae28e71acacb76d00687333c17282
+#4 extracting sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553
+#4 extracting sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 7.9s done
+#4 DONE 24.2s
 
-stPreMigration.setString(1, riskId);
-    stPreMigration.setString(2, migrationAuthor);
+#4 [src  1/11] FROM docker.io/library/golang:1.24.5@sha256:ef5b4be1f94b36c90385abd9b6b4f201723ae28e71acacb76d00687333c17282
+#4 extracting sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff
+#4 extracting sha256:a73486c29d94e0a0d8be407ddacbf55621b48b4818df319d0d9eb16339412fff 10.2s done
+#4 DONE 34.3s
 
-    try (ResultSet rs = stPreMigration.executeQuery()) {
-        if (rs.next()) {
-            String noteId = rs.getString(1);
-            String existingText = rs.getString(2);
+#4 [src  1/11] FROM docker.io/library/golang:1.24.5@sha256:ef5b4be1f94b36c90385abd9b6b4f201723ae28e71acacb76d00687333c17282
+#4 extracting sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f
+#4 extracting sha256:a3e4aa2eec44b6580a06950b078a57600d112e526d555d23cbf8ffe311ec7f6f 15.3s done
+#4 extracting sha256:85db7d6e6763f6a466c21994a684dc9102dd0390585b0e07b2259a397e9fc0f0
+#4 extracting sha256:85db7d6e6763f6a466c21994a684dc9102dd0390585b0e07b2259a397e9fc0f0 9.0s done
+#4 DONE 58.6s
 
-            if (noteId != null && !note.note().equals(existingText)) {
-                try (PreparedStatement stUpdate = conn.prepareStatement(
-                        "UPDATE Notes SET ModificationDate = ?, Description = ? WHERE Id = ?");
-                     PreparedStatement stHistory = conn.prepareStatement(
-                        "INSERT INTO NoteHistories (Id, CreationDate, ModificationDate, Description, AuthorId, NoteType, NoteId) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+#4 [src  1/11] FROM docker.io/library/golang:1.24.5@sha256:ef5b4be1f94b36c90385abd9b6b4f201723ae28e71acacb76d00687333c17282
+#4 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1
+#4 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 9.2s done
+#4 DONE 67.8s
 
-                    updateNote(stUpdate, noteId, now, note.note());
-                    insertNoteHistory(stHistory, noteId, now, rs.getTimestamp(3), note.note(), rs.getString(4), rs.getInt(5));
-                }
-            }
-        } else {
-            try (PreparedStatement stInsert = conn.prepareStatement(
-                    "INSERT INTO Notes (Id, CreationDate, ModificationDate, Description, AuthorId, NoteType, RiskId) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
-                String noteId = UUID.randomUUID().toString();
-                insertNote(stInsert, noteId, note.creationDate(), now, note.note(), migrationAuthor, 0, riskId);
-            }
-        }
-    }
-}
+#8 [src  2/11] ADD .gitconfig /root/.gitconfig
+#8 DONE 8.6s
 
-}
+#9 [src  3/11] ADD id_rsa /root/.ssh/id_rsa
+#9 DONE 8.8s
 
-private void handlePostMigrationLogic(Connection conn, String riskId, Note note, LocalDateTime now, String migrationAuthor) throws SQLException { try (PreparedStatement stPostMigration = conn.prepareStatement( "SELECT n.Description FROM Notes n WHERE n.RiskId = ? ORDER BY n.CreationDate")) {
+#10 [src  4/11] ADD http://uaclplgapp23.al.intraxa/dl/AXA-PROXY-ROOT-CA.crt /usr/local/share/ca-certificates/AXA-PROXY-ROOT-CA.crt
+#10 DONE 9.0s
 
-stPostMigration.setString(1, riskId);
+#11 [src  5/11] ADD http://uaclplgapp23.al.intraxa/dl/katello-server-ca.pem /usr/local/share/ca-certificates/katello-server-ca.pem
+#11 DONE 8.4s
 
-    boolean noteAlreadyExists = false;
-    try (ResultSet rs = stPostMigration.executeQuery()) {
-        while (rs.next()) {
-            String existingText = rs.getString(1);
-            if (note.note().equals(existingText)) {
-                noteAlreadyExists = true;
-                break;
-            }
-        }
-    }
+#12 [src  6/11] RUN update-ca-certificates &&     chmod 700 /root/.ssh &&     chmod 600 /root/.ssh/id_rsa &&     mkdir /app &&     addgroup --gid 1001 app &&     adduser --uid 1001 --gid 1001 --home /app --no-create-home app &&     chown app:app /app
+#12 8.578 Updating certificates in /etc/ssl/certs...
+#12 10.86 rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+#12 10.87 1 added, 0 removed; done.
+#12 10.87 Running hooks in /etc/ca-certificates/update.d...
+#12 10.88 done.
+#12 10.96 Adding group `app' (GID 1001) ...
+#12 10.97 Done.
+#12 11.03 Adding user `app' ...
+#12 11.03 Adding new user `app' (1001) with group `app (1001)' ...
+#12 11.07 Not creating home directory `/app'.
+#12 11.08 New password: Password change has been aborted.
+#12 11.08 passwd: Authentication token manipulation error
+#12 11.08 passwd: password unchanged
+#12 11.08 Try again? [y/N] Use of uninitialized value $answer in chop at /usr/sbin/adduser line 740.
+#12 11.08 Use of uninitialized value $answer in pattern match (m//) at /usr/sbin/adduser line 741.
+#12 11.08 Use of uninitialized value $answer in pattern match (m//) at /usr/sbin/adduser line 742.
+#12 11.09 Changing the user information for app
+#12 11.09 Enter the new value, or press ENTER for the default
+#12 11.09 	Full Name []: 	Room Number []: 	Work Phone []: 	Home Phone []: 	Other []: Is the information correct? [Y/n] Adding new user `app' to supplemental / extra groups `users' ...
+#12 11.10 Adding user `app' to group `users' ...
+#12 11.10 Use of uninitialized value $answer in chop at /usr/sbin/adduser line 766.
+#12 11.10 Use of uninitialized value $answer in pattern match (m//) at /usr/sbin/adduser line 767.
+#12 11.10 Use of uninitialized value $answer in pattern match (m//) at /usr/sbin/adduser line 768.
+#12 DONE 11.2s
 
-    if (!noteAlreadyExists) {
-        try (PreparedStatement stInsert = conn.prepareStatement(
-                "INSERT INTO Notes (Id, CreationDate, ModificationDate, Description, AuthorId, NoteType, RiskId) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
-            String noteId = UUID.randomUUID().toString();
-            insertNote(stInsert, noteId, note.creationDate(), now, note.note(), migrationAuthor, 0, riskId);
-        }
-    }
-}
+#13 [src  7/11] WORKDIR /app
+#13 DONE 11.7s
 
-}
+#14 [src  8/11] ADD *.go go.mod go.sum /app/
+#14 DONE 11.6s
 
-private void updateNote(PreparedStatement stUpdate, String noteId, LocalDateTime now, String newText) throws SQLException { stUpdate.setTimestamp(1, Timestamp.valueOf(now)); stUpdate.setString(2, newText); stUpdate.setString(3, noteId); stUpdate.executeUpdate(); }
+#15 [src  9/11] ADD cmd /app/cmd
+#15 DONE 9.8s
 
-private void insertNote(PreparedStatement stInsert, String noteId, LocalDateTime created, LocalDateTime modified, String text, String authorId, int noteType, String riskId) throws SQLException { stInsert.setString(1, noteId); stInsert.setTimestamp(2, Timestamp.valueOf(created)); stInsert.setTimestamp(3, Timestamp.valueOf(modified)); stInsert.setString(4, text); stInsert.setString(5, authorId); stInsert.setInt(6, noteType); stInsert.setString(7, riskId); stInsert.executeUpdate(); }
+#16 [src 10/11] ADD core /app/core
+#16 DONE 9.7s
 
-private void insertNoteHistory(PreparedStatement stHistory, String noteId, LocalDateTime modified, Timestamp created, String text, String authorId, int noteType) throws SQLException { stHistory.setString(1, UUID.randomUUID().toString()); stHistory.setTimestamp(2, created); stHistory.setTimestamp(3, Timestamp.valueOf(modified)); stHistory.setString(4, text); stHistory.setString(5, authorId); stHistory.setInt(6, noteType); stHistory.setString(7, noteId); stHistory.executeUpdate(); }
+#17 [src 11/11] ADD internal /app/internal
+#17 DONE 9.4s
 
-private record RiskInfo(String riskId, Timestamp creationDate) {}
+#18 [calculate-delta-build 1/1] RUN GOPRIVATE=prclpclapp34.al.intraxa,github.axa.com CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-w -s -X main.version=1.0.0.48" -o calculate-delta cmd/calculateDelta/main.go
+#18 9.135 go: downloading github.axa.com/axa-partners-clp/mrt-shared v0.0.0-20241212152024-6eb8d7e72532
+#18 9.137 go: downloading github.com/jackc/pgx/v4 v4.18.3
+#18 9.137 go: downloading github.com/spf13/viper v1.20.1
+#18 9.201 go: downloading github.com/denisenkom/go-mssqldb v0.12.3
+#18 9.400 go: downloading github.com/google/uuid v1.6.0
+#18 9.675 go: downloading github.com/fsnotify/fsnotify v1.9.0
+#18 9.675 go: downloading github.com/go-viper/mapstructure/v2 v2.4.0
+#18 9.740 go: downloading github.com/sagikazarmark/locafero v0.10.0
+#18 9.767 go: downloading github.com/spf13/afero v1.14.0
+#18 9.788 go: downloading github.com/spf13/cast v1.9.2
+#18 9.847 go: downloading github.com/spf13/pflag v1.0.7
+#18 9.949 go: downloading github.com/jackc/pgconn v1.14.3
+#18 9.957 go: downloading github.com/jackc/pgtype v1.14.4
+#18 10.07 go: downloading github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9
+#18 10.12 go: downloading github.com/golang-sql/sqlexp v0.1.0
+#18 10.15 go: downloading golang.org/x/crypto v0.40.0
+#18 10.21 go: downloading golang.org/x/sys v0.34.0
+#18 10.21 go: downloading github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8
+#18 10.22 go: downloading golang.org/x/text v0.27.0
+#18 10.87 go: downloading github.com/subosito/gotenv v1.6.0
+#18 10.93 go: downloading github.com/pelletier/go-toml/v2 v2.2.4
+#18 11.13 go: downloading gopkg.in/yaml.v3 v3.0.1
+#18 11.45 go: downloading github.com/jackc/chunkreader/v2 v2.0.1
+#18 11.51 go: downloading github.com/jackc/pgio v1.0.0
+#18 11.54 go: downloading github.com/jackc/pgpassfile v1.0.0
+#18 11.59 go: downloading github.com/jackc/pgproto3/v2 v2.3.3
+#18 11.68 go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
+#18 DONE 36.9s
 
+#19 [calculate-delta 1/3] COPY --from=calculate-delta-build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+#19 DONE 0.0s
+
+#20 [calculate-delta 2/3] COPY --from=calculate-delta-build /etc/passwd /etc/group /etc/
+#20 DONE 0.1s
+
+#21 [calculate-delta 3/3] COPY --from=calculate-delta-build --chown=root:app /app/calculate-delta /app/calculate-delta
+#21 DONE 0.1s
+
+#22 exporting to oci image format
+#22 exporting layers
+#22 exporting layers 0.8s done
+#22 exporting manifest sha256:6c0730b00f40bb3abed0575b6a6202a5465319f587165b5b22bef89c5da8185b done
+#22 exporting config sha256:952b2165818b841cbbfbc5c9936fd988eefa3211d324150efcdc615413559eac done
+#22 sending tarball 0.1s done
+#22 DONE 0.9s
+
+#23 exporting cache to client directory
+#23 preparing build cache for export
+#23 writing layer sha256:261adba635f85f93145ebd08553416510db461e87fe5547c52702017f686f10d 0.0s done
+#23 writing layer sha256:450dfac385654eeca17c51f3df0d5677c26d88c4e8140b1823b556d7bba39fef 0.0s done
+#23 writing layer sha256:c08f4644433a6966c87257ef15932d0b0d5c7bed79700244a6bf9dac0112beee 0.1s done
+#23 writing config sha256:9adfe2e961146aeee1c4b3f89baca929fa7bde5f6ec0b423bb3f2c2bb7d90782
+#23 preparing build cache for export 0.2s done
+#23 writing config sha256:9adfe2e961146aeee1c4b3f89baca929fa7bde5f6ec0b423bb3f2c2bb7d90782 done
+#23 writing cache manifest sha256:52f9b68a89aa3550fab25394661bb7f59290c01f71d4275cbef3518d6cc59abc done
+#23 DONE 0.2s
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Scan Docker Image)
+[Pipeline] sh
++ wget https://uaclplgapp23.al.intraxa/dl/grype
+Connecting to uaclplgapp23.al.intraxa (172.21.87.40:443)
+saving to 'grype'
+grype                 41% |*************                   | 28.8M  0:00:01 ETA
+grype                100% |********************************| 68.7M  0:00:00 ETA
+'grype' saved
++ chmod 755 grype
++ mv grype /usr/local/bin/
++ wget https://uaclplgapp23.al.intraxa/dl/grype.tmpl
+Connecting to uaclplgapp23.al.intraxa (172.21.87.40:443)
+saving to 'grype.tmpl'
+grype.tmpl           100% |********************************|  3323  0:00:00 ETA
+'grype.tmpl' saved
++ GRYPE_MATCH_GOLANG_USING_CPES=false /usr/local/bin/grype oci-archive:/tmp/image.tar -f high -o template --file report.html -t grype.tmpl --only-fixed
+[0060] ERROR [31mdiscovered vulnerabilities at or above the severity threshold[0m
+[Pipeline] emailextrecipients
+Warning: user (id: igor.kolomiyets.ext, email: igor.kolomiyets.ext@partners.axa) is not a recognized user, but sending mail anyway
+Adding igor.kolomiyets.ext with address igor.kolomiyets.ext@partners.axa
+Analyzing: igor.kolomiyets.ext@partners.axa
+Looking for: igor.kolomiyets.ext@partners.axa
+	starting at: 0
+	firstFoundIdx: 0
+	firstFoundIdx-substring: igor.kolomiyets.ext@partners.axa
+	=> found type: 0
+Analyzing: igor.kolomiyets.ext@partners.axa
+Looking for: igor.kolomiyets.ext@partners.axa
+	starting at: 0
+	firstFoundIdx: 0
+	firstFoundIdx-substring: igor.kolomiyets.ext@partners.axa
+	=> found type: 0
+Analyzing: igor.kolomiyets.ext@partners.axa
+Looking for: igor.kolomiyets.ext@partners.axa
+	starting at: 0
+	firstFoundIdx: 0
+	firstFoundIdx-substring: igor.kolomiyets.ext@partners.axa
+	=> found type: 0
+Adding IYER, Ramachandran (AXA CLP, Contractor) with address ramachandran.iyer.ext@partners.axa
+Analyzing: ramachandran.iyer.ext@partners.axa
+Looking for: ramachandran.iyer.ext@partners.axa
+	starting at: 0
+	firstFoundIdx: 0
+	firstFoundIdx-substring: ramachandran.iyer.ext@partners.axa
+	=> found type: 0
+Analyzing: ramachandran.iyer.ext@partners.axa
+Looking for: ramachandran.iyer.ext@partners.axa
+	starting at: 0
+	firstFoundIdx: 0
+	firstFoundIdx-substring: ramachandran.iyer.ext@partners.axa
+	=> found type: 0
+Analyzing: ramachandran.iyer.ext@partners.axa
+Looking for: ramachandran.iyer.ext@partners.axa
+	starting at: 0
+	firstFoundIdx: 0
+	firstFoundIdx-substring: ramachandran.iyer.ext@partners.axa
+	=> found type: 0
+Adding IYER, Ramachandran (AXA CLP, Contractor) with address ramachandran.iyer.ext@partners.axa
+Analyzing: ramachandran.iyer.ext@partners.axa
+Looking for: ramachandran.iyer.ext@partners.axa
+	starting at: 0
+	firstFoundIdx: 0
+	firstFoundIdx-substring: ramachandran.iyer.ext@partners.axa
+	=> found type: 0
+Analyzing: ramachandran.iyer.ext@partners.axa
+Looking for: ramachandran.iyer.ext@partners.axa
+	starting at: 0
+	firstFoundIdx: 0
+	firstFoundIdx-substring: ramachandran.iyer.ext@partners.axa
+	=> found type: 0
+Analyzing: ramachandran.iyer.ext@partners.axa
+Looking for: ramachandran.iyer.ext@partners.axa
+	starting at: 0
+	firstFoundIdx: 0
+	firstFoundIdx-substring: ramachandran.iyer.ext@partners.axa
+	=> found type: 0
+[Pipeline] step
+No mail will be sent out, as 'DMS Migration » Post Migration Delta Calculation Tool » master #48' does not have a result yet. Please make sure you set a proper result in case of pipeline/build scripts.
+[Pipeline] publishHTML
+[htmlpublisher] Archiving HTML reports...
+[htmlpublisher] Archiving at BUILD level /home/jenkins/agent/workspace/gration-delta-calculation_master to /var/jenkins_home/jobs/dms-migration/jobs/post-migration-delta-calculation/branches/master/builds/48/htmlreports/Grype_20Scan_20Report
+[htmlpublisher] Copying recursive using current thread
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // container
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] }
+[Pipeline] // podTemplate
+[Pipeline] End of Pipeline
+ERROR: script returned exit code 2
+
+GitHub has been notified of this commit’s build result
+
+Finished: FAILURE
