@@ -1,0 +1,132 @@
+C:\Users\900011520.AL>kubecl describe pod dms-migration-service-664dc5d789-c8lmz
+'kubecl' is not recognized as an internal or external command,
+operable program or batch file.
+
+C:\Users\900011520.AL>kubectl describe pod dms-migration-service-664dc5d789-c8lmz
+Name:             dms-migration-service-664dc5d789-c8lmz
+Namespace:        dms-migration-uat
+Priority:         0
+Service Account:  default
+Node:             uaclplgapp33.al.intraxa/172.21.87.84
+Start Time:       Tue, 26 Aug 2025 10:56:01 +0100
+Labels:           app.kubernetes.io/environment=uat
+                  app.kubernetes.io/name=dms-migration-service
+                  monitoring=true
+                  pod-template-hash=664dc5d789
+Annotations:      cni.projectcalico.org/containerID: fd45642a1fb9c46af7e6d2aa00078ccdc3f0d4f3721645b94c792b2344a467bd
+                  cni.projectcalico.org/podIP: 10.233.92.166/32
+                  cni.projectcalico.org/podIPs: 10.233.92.166/32
+Status:           Running
+IP:               10.233.92.166
+IPs:
+  IP:           10.233.92.166
+Controlled By:  ReplicaSet/dms-migration-service-664dc5d789
+Containers:
+  dms-migration-service:
+    Container ID:   cri-o://df86b029b445ddd63dd05de3475aa410354f2676635bcd6f20dee1ad71865527
+    Image:          clpregistrystaging.al.intraxa/dms-migration-service:2.4.2.295
+    Image ID:       clpregistrystaging.al.intraxa/dms-migration-service@sha256:0730c0400545d75057ff8cf64236df7a276dc17ca6f8244c726bfa80057d0239
+    Port:           8080/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Tue, 26 Aug 2025 10:56:02 +0100
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     400m
+      memory:  1536M
+    Requests:
+      cpu:      200m
+      memory:   300M
+    Liveness:   http-get http://:8080/healthz delay=30s timeout=1s period=10s #success=1 #failure=20
+    Readiness:  http-get http://:8080/ready delay=30s timeout=3s period=10s #success=1 #failure=20
+    Environment:
+      server_port:                           8080
+      JAVA_OPTS:                             -Xms300m -Xmx1024m -XX:MaxRAM=1536m -Dhttp.proxyHost=uaclplgapp27.al.intraxa -Dhttp.proxyPort=8080 -Dhttp.nonProxyHosts="localhost|*.al.intraxa|cmx-eu-pp.corp.intraxa|maam-stg.axa.com" -Dhttps.proxyHost=uaclplgapp27.al.intraxa -Dhttps.proxyPort=8080 -Dhttps.nonProxyHosts="localhost|*.al.intraxa|cmx-eu-pp.corp.intraxa|maam-stg.axa.com"  -javaagent:./opentelemetry-javaagent.jar -Dotel.exporter.otlp.endpoint=http://uaclplgapp24.al.intraxa:4317 -Dotel.resource.attributes=service.name=dms-migration-service,service.version=2.1.0,deployment.environment=uat
+      oauth2_ui_client_id:                   <set to the key 'client_id' in secret 'oauth-credentials'>      Optional: false
+      oauth2_ui_client_secret:               <set to the key 'client_secret' in secret 'oauth-credentials'>  Optional: false
+      oauth2_ui_audience:                    https://dms-migration.uat.al.intraxa
+      oauth2_proxy_host:                     uaclplgapp27.al.intraxa
+      oauth2_proxy_port:                     8080
+      jdbc_driverClassName:                  org.postgresql.Driver
+      jdbc_url:                              jdbc:postgresql://uaclplgapp23.al.intraxa:5432/dmsmigdb?ssl=true&sslmode=require
+      jdbc_username:                         <set to the key 'username' in secret 'database-credentials'>  Optional: false
+      jdbc_password:                         <set to the key 'password' in secret 'database-credentials'>  Optional: false
+      risks_url:                             jdbc:sqlserver://mrt-mig-mssql-rds.cd0gqww6ocmi.eu-central-1.rds.amazonaws.com:1433;Database=MIG_DMSRISKS;Persist Security Info=False;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30
+      risks_username:                        <set to the key 'risks_username' in secret 'dms-db-mig-credentials'>  Optional: false
+      risks_password:                        <set to the key 'risks_password' in secret 'dms-db-mig-credentials'>  Optional: false
+      decisions_url:                         jdbc:sqlserver://mrt-mig-mssql-rds.cd0gqww6ocmi.eu-central-1.rds.amazonaws.com:1433;Database=MIG_DMSDECISIONS;Persist Security Info=False;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30
+      decisions_username:                    <set to the key 'decisions_username' in secret 'dms-db-mig-credentials'>  Optional: false
+      decisions_password:                    <set to the key 'decisions_password' in secret 'dms-db-mig-credentials'>  Optional: false
+      jdbc_connectionPool_ms_minSize:        10
+      jdbc_connectionPool_ms_maxSize:        20
+      encryption_secret:                     <set to the key 'secret' in secret 'application-key'>  Optional: false
+      spring_rabbitmq_host:                  uaclplgapp24.al.intraxa
+      rabbitmq_prefix:                       axa.partners.clp.dms-migration-service-uat.
+      spring_rabbitmq_virtual_host:          dms-migration-service-uat
+      spring_rabbitmq_username:              <set to the key 'username' in secret 'rabbitmq-credentials'>  Optional: false
+      spring_rabbitmq_password:              <set to the key 'password' in secret 'rabbitmq-credentials'>  Optional: false
+      aws_bucket:                            axa-cmx-eu-partners-preprod-42d3-lz
+      cmx_baseUrl:                           https://cmx-eu-pp.corp.intraxa/v2/thor/core
+      cmx_profileName:                       partners-dms-migration-basic-access
+      cmx_tokenUrl:                          https://maam-stg.axa.com/maam/v2/token
+      cmx_clientId:                          <set to the key 'cmx.clientId' in secret 'cmx-credentials'>           Optional: false
+      cmx_clientSecret:                      <set to the key 'cmx.clientSecret' in secret 'cmx-credentials'>       Optional: false
+      AWS_ACCESS_KEY_ID:                     <set to the key 'aws_access_key' in secret 'aws-credentials'>         Optional: false
+      AWS_SECRET_ACCESS_KEY:                 <set to the key 'aws_secret_access_key' in secret 'aws-credentials'>  Optional: false
+      sf_baseUrl:                            https://webcreditor--mrsit.my.salesforce.com
+      sf_clientId:                           <set to the key 'clientId' in secret 'salesforce-credentials'>       Optional: false
+      sf_clientSecret:                       <set to the key 'clientSecret' in secret 'salesforce-credentials'>   Optional: false
+      sf_userName:                           <set to the key 'userName' in secret 'salesforce-credentials'>       Optional: false
+      sf_password:                           <set to the key 'password' in secret 'salesforce-credentials'>       Optional: false
+      sf_securityToken:                      <set to the key 'securityToken' in secret 'salesforce-credentials'>  Optional: false
+      sf_accessTokenExpiresIn:               900
+      selmed_sf_page:                        1000
+      selmed_dms_page:                       10000
+      sf_batchSize:                          30
+      sf_maxThreads:                         20
+      dms_application_size:                  10000
+      dms_coverages_size:                    10000
+      dms_processingThreads:                 5
+      dms_processingBatchSize:               2000
+      dms_updatePackageThreads:              5
+      dms_updatePackageProcessingBatchSize:  2000
+      sf_opportunity_recordTypeId:           0125E000000X1c7QAC
+      sf_loan_recordTypeId:                  0125E000000X1c8QAC
+      sf_case_recordTypeId:                  0125E000000X1c5QAC
+      sf_case_ownerId_fr:                    00G5E000008kkp9UAA
+      sf_case_ownerId_it:                    00G5E000008kkpBUAQ
+      sf_case_ownerId_intl:                  00G5E000008kkpAUAQ
+      sf_history_ownerId:                    0051w0000068QGPAA2
+      sf_businessHoursId_default:            01m0N000000cGq5QAE
+      sf_businessHoursId_fr:                 01m5E0000000Ic2QAE
+      sf_businessHoursId_intl:               01m5E0000000Ic3QAE
+      sf_businessHoursId_it:                 01m5E0000000Ic4QAE
+      cron_decisionsProcessingJob:           0 * * * * *
+      cron_macaoDecisionsMigrationJob:       0 * * * * *
+      cron_macaoNotesMigrationJob:           0 * * * * *
+      cache_sf_persistentDirectory:          /tmp/cache/sf-results
+      KUBERNETES_SERVER_URL:                 https://kubernetes.default.svc
+      KUBERNETES_CA:                         <set to the key 'ca.crt' in secret 'k8s-credentials'>  Optional: false
+      KUBERNETES_TOKEN:                      <set to the key 'token' in secret 'k8s-credentials'>   Optional: false
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-6gmf9 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True
+  Initialized                 True
+  Ready                       True
+  ContainersReady             True
+  PodScheduled                True
+Volumes:
+  kube-api-access-6gmf9:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:                      <none>
