@@ -1,0 +1,104 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+    id 'org.springframework.boot' version '3.5.3'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+sourceCompatibility = compatibility
+targetCompatibility = compatibility
+
+group = projectGroup
+def env = System.getenv()
+def buildNumberStr = env['BUILD_NUMBER']
+def artifactVersion = baseVersion + (buildNumberStr != null ? "." + buildNumberStr : "-SNAPSHOT")
+version = artifactVersion
+
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+jacocoTestReport {
+    reports {
+        xml.required.set(true)
+    }
+}
+
+jar {
+    archiveBaseName.set(projectName)
+    archiveVersion.set(artifactVersion)
+    manifest {
+        attributes("Implementation-Title": projectGroup + ":" + projectName,
+                "Implementation-Version": jar.archiveVersion,
+                "Implementation-Vendor": softwareVendor)
+    }
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-web-services'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.19.1'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.19.1'
+    implementation 'org.apache.httpcomponents.client5:httpclient5:5.5'
+    implementation 'io.opentelemetry:opentelemetry-api:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-sdk:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-context:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-sdk-metrics:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-sdk-logs:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-sdk-trace:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-sdk-common:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-sdk-extension-autoconfigure:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-sdk-extension-autoconfigure-spi:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp-common:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-exporter-common:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-exporter-logging:1.52.0'
+    implementation 'io.opentelemetry:opentelemetry-exporter-sender-okhttp:1.52.0'
+    implementation 'io.opentelemetry.instrumentation:opentelemetry-jdbc:2.17.1-alpha'
+    implementation 'io.opentelemetry.semconv:opentelemetry-semconv:1.34.0'
+
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.springframework.amqp:spring-rabbit-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation "org.testcontainers:junit-jupiter"
+    testImplementation  'io.iktech:artifactz-client:1.3.1'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+tasks.register('scan', Exec) {
+    dependsOn build
+    println "Scanning ${bootJar.archiveFile.get()} archive"
+    project.mkdir "${rootProject.layout.buildDirectory.get()}/reports/scan/"
+    def f = new File('grype.tmpl')
+    if (!f.exists()) {
+        new URI('http://appsstaging.al.intraxa/dl/grype.tmpl').toURL().withInputStream{ i -> f.withOutputStream{ it << i }}
+    }
+    commandLine 'grype', "${bootJar.archiveFile.get()}", '-f', 'high', '--only-fixed', '--scope', 'all-layers', '-o', 'template', '--file', "${rootProject.layout.buildDirectory.get()}/reports/scan/report.html", '-t', 'grype.tmpl'
+}
+
+tasks.register('buildLocalImage', Exec) {
+    commandLine 'docker', 'build', '--progress', 'plain', '-t', 'document-bridge-service', '--build-arg', 'http_proxy=http://uaclplgapp23.al.intraxa:5300', '--build-arg', "artifact_version=${artifactVersion}", '.'
+}
+
+tasks.register('buildDebugImage', Exec) {
+    commandLine 'docker', 'build', '--progress', 'plain', '-t', 'document-bridge-service', '--target', 'debug', '--build-arg', 'http_proxy=http://uaclplgapp23.al.intraxa:5300', '--build-arg', "artifact_version=${artifactVersion}", '.'
+}
