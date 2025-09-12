@@ -1,0 +1,4 @@
+ignore:
+  - vulnerability: GHSA-xmmg-2gg8-w7r9   # Nimbus
+  - vulnerability: GHSA-93c-gwx5-v52f   # Spring WebMVC
+  - vulnerability: GHSA-9qr3-2crv-x8m3  # Tomcat
