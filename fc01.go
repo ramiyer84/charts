@@ -118,7 +118,7 @@ func (fc File) ProcessFile(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-		addedAt := time.Now().UTC()
+	addedAt := time.Now().UTC()
 	id, err := fc.Db.AddFile(ctx, fc.Tx, fc.BatchID, fc.Filename, "FC01", addedAt)
 	if err != nil {
 		return err
