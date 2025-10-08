@@ -6,35 +6,50 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/worker"
+	"github.com/spf13/viper"
 )
 
-// FileItem represents one file and satisfies worker.Item.
+// FileItem represents a single file entry.
 type FileItem string
 
 func (i FileItem) Name() string { return string(i) }
 
-// FileProvider implements worker.Provider for the local filesystem.
+// FileProvider implements worker.Provider for local filesystem access.
 type FileProvider struct {
 	root    string
 	pattern string
 }
 
-// List scans the directory and returns items matching the pattern.
-func (p *FileProvider) List(_ context.Context) ([]worker.Item, error) {
+func NewFileProvider(root, pattern string) *FileProvider {
+	return &FileProvider{root: root, pattern: pattern}
+}
+
+func (p *FileProvider) List(_ context.Context) ([]FileItem, error) {
 	matches, err := filepath.Glob(filepath.Join(p.root, p.pattern))
 	if err != nil {
 		return nil, err
 	}
-	items := make([]worker.Item, 0, len(matches))
+	items := make([]FileItem, 0, len(matches))
 	for _, m := range matches {
 		items = append(items, FileItem(filepath.Base(m)))
 	}
 	return items, nil
 }
 
-// Open opens the given item for reading.
-func (p *FileProvider) Open(_ context.Context, it worker.Item) (io.ReadCloser, error) {
-	path := filepath.Join(p.root, it.Name())
-	return os.Open(path)
+func (p *FileProvider) Open(_ context.Context, i FileItem) (io.ReadCloser, error) {
+	return os.Open(filepath.Join(p.root, i.Name()))
+}
+
+// ---- These satisfy the extended worker.Provider interface ----
+
+// OnSuccess moves a successfully processed file to the “processed” folder.
+func (p *FileProvider) OnSuccess(_ context.Context, name string) error {
+	dst := filepath.Join(viper.GetString("location.processed"), name)
+	return os.Rename(filepath.Join(p.root, name), dst)
+}
+
+// OnError moves a failed file to the “error” folder.
+func (p *FileProvider) OnError(_ context.Context, name string) error {
+	dst := filepath.Join(viper.GetString("location.error"), name)
+	return os.Rename(filepath.Join(p.root, name), dst)
 }
