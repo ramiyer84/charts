@@ -1,4 +1,4 @@
-package provider
+package file
 
 import (
 	"context"
@@ -6,50 +6,41 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/viper"
+	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/worker"
 )
 
-// FileItem represents a single file entry.
+// FileItem represents one file and satisfies worker.Item.
 type FileItem string
 
 func (i FileItem) Name() string { return string(i) }
 
-// FileProvider implements worker.Provider for local filesystem access.
-type FileProvider struct {
+// Provider implements worker.Provider for local filesystem.
+type Provider struct {
 	root    string
 	pattern string
 }
 
-func NewFileProvider(root, pattern string) *FileProvider {
-	return &FileProvider{root: root, pattern: pattern}
+// New creates a new local file provider rooted at 'root' and constrained by 'pattern'.
+func New(root, pattern string) *Provider {
+	return &Provider{root: root, pattern: pattern}
 }
 
-func (p *FileProvider) List(_ context.Context) ([]FileItem, error) {
-	matches, err := filepath.Glob(filepath.Join(p.root, p.pattern))
+// List finds files that match the configured pattern under root.
+func (p *Provider) List(_ context.Context) ([]worker.Item, error) {
+	glob := filepath.Join(p.root, p.pattern)
+	matches, err := filepath.Glob(glob)
 	if err != nil {
 		return nil, err
 	}
-	items := make([]FileItem, 0, len(matches))
+	out := make([]worker.Item, 0, len(matches))
 	for _, m := range matches {
-		items = append(items, FileItem(filepath.Base(m)))
+		out = append(out, FileItem(m))
 	}
-	return items, nil
+	return out, nil
 }
 
-func (p *FileProvider) Open(_ context.Context, i FileItem) (io.ReadCloser, error) {
-	return os.Open(filepath.Join(p.root, i.Name()))
-}
-
-// ---- These satisfy the extended worker.Provider interface ----
-
-// OnSuccess moves a successfully processed file to the “processed” folder.
-func (p *FileProvider) OnSuccess(_ context.Context, name string) error {
-	dst := filepath.Join(viper.GetString("location.processed"), name)
-	return os.Rename(filepath.Join(p.root, name), dst)
-}
-
-// OnError moves a failed file to the “error” folder.
-func (p *FileProvider) OnError(_ context.Context, name string) error {
-	dst := filepath.Join(viper.GetString("location.error"), name)
-	return os.Rename(filepath.Join(p.root, name), dst)
+// Open opens the file for reading.
+func (p *Provider) Open(_ context.Context, it worker.Item) (io.ReadCloser, error) {
+	name := it.Name()
+	return os.Open(name)
 }
