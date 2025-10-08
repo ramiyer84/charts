@@ -1,4 +1,4 @@
-package file_test
+package file
 
 import (
 	"context"
@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	fileprov "github.axa.com/axa-partners-clp/selmed-migration-tool/internal/provider/file"
 )
 
 func TestFileProvider_ListAndOpen(t *testing.T) {
@@ -31,7 +29,7 @@ func TestFileProvider_ListAndOpen(t *testing.T) {
 	}
 
 	// pattern picks only .txt
-	p := fileprov.New(dir, "*.txt")
+	p := New(dir, "*.txt")
 
 	items, err := p.List(context.Background())
 	if err != nil {
@@ -52,8 +50,7 @@ func TestFileProvider_ListAndOpen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	s := string(b)
-	if !strings.HasPrefix(s, "hello-") {
-		t.Fatalf("unexpected body %q", s)
+	if got := string(b); !strings.HasPrefix(got, "hello-") {
+		t.Fatalf("unexpected body %q", got)
 	}
 }
