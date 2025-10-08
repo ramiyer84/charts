@@ -1,0 +1,20 @@
+package worker
+
+import "testing"
+
+func TestRoute(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"SLMD_MACAOFC01_20240101.txt", "FC01"},
+		{"slmd_macaofc02_ABC.txt", "FC02"},
+		{"whatever-FC19.csv", "FC19"},
+		{"no-code-here.txt", ""},
+	}
+	for _, c := range cases {
+		if got := route(c.in); got != c.want {
+			t.Errorf("route(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
