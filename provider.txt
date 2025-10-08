@@ -1,0 +1,15 @@
+package provider
+
+import (
+	// We return the worker-facing interface
+	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/worker"
+
+	// Concrete local-filesystem implementation
+	fileprov "github.axa.com/axa-partners-clp/selmed-migration-tool/internal/provider/file"
+)
+
+// NewFileProvider returns a worker.Provider backed by the local filesystem.
+// Callers should treat the returned value only as worker.Provider.
+func NewFileProvider(root, pattern string) worker.Provider {
+	return fileprov.New(root, pattern)
+}
