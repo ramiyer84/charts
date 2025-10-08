@@ -1,0 +1,40 @@
+package fc19
+
+import (
+	"bufio"
+	"io"
+	"time"
+
+	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/logger"
+)
+
+func BuildCompanionMapFromReader(r io.Reader, l *logger.Logger) (map[string]time.Time, error) {
+	res := make(map[string]time.Time)
+	sc := bufio.NewScanner(r)
+
+	// skip header
+	if sc.Scan() {
+		// ok
+	}
+
+	for sc.Scan() {
+		line := sc.Text()
+		if len(line) < 119 {
+			continue
+		}
+		rec, err := parseFC19Content(line)
+		if err != nil {
+			if l != nil {
+				l.Printf("fc19 companion parse error: %v", err)
+			}
+			continue
+		}
+		if rec.ApplicationStatus.Valid && rec.ApplicationStatus.String == "CRE" && rec.StatusCreationDate.Valid {
+			res[rec.ApplicationNumber] = rec.StatusCreationDate.Time
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
