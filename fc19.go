@@ -4,18 +4,17 @@ import (
 	"bufio"
 	"context"
 	"database/sql"
-	"errors"
-	"fmt"
-	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile"
-	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/logger"
-	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/util"
 	"strings"
 	"time"
+
+	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile"
+	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/util"
 )
 
+// File is the FC19 processor. It consumes the provided Reader and writes to DB.
 type File struct {
 	*inputfile.SourceFile
-	Range *inputfile.Range
+	Range *inputfile.Range // optional; worker may set a cache to validate once
 }
 
 // Source table name: KJDTLED
@@ -34,12 +33,12 @@ func (fc File) AsyncProcessFile(ctx context.Context) {
 }
 
 func (fc File) ProcessFile(ctx context.Context) error {
-	// If worker didn't validate, do it here once
+	// If worker didn't validate ranges, do it here once.
+	// NOTE: Range.Validate in the original codebase does not return an error.
 	if fc.Range != nil && !fc.Range.Loaded {
-		if err := fc.Range.Validate(ctx, fc.Db, fc.Tx, fc.BatchID); err != nil {
-			return fmt.Errorf("fc19: range validate failed: %w", err)
-		}
+		fc.Range.Validate(ctx, fc.Db, fc.Tx, fc.BatchID)
 	}
+
 	addedAt := time.Now().UTC()
 	id, err := fc.Db.AddFile(ctx, fc.Tx, fc.BatchID, fc.Filename, "FC19", addedAt)
 	if err != nil {
@@ -47,7 +46,7 @@ func (fc File) ProcessFile(ctx context.Context) error {
 	}
 
 	r := bufio.NewScanner(fc.Reader)
-	// Skip the first line
+	// Skip the first line (header)
 	r.Scan()
 
 	count := 0
@@ -55,30 +54,39 @@ func (fc File) ProcessFile(ctx context.Context) error {
 	for r.Scan() {
 		count++
 		line := r.Text()
-		applicationNumber := line[:11]
+
+		// Basic length check & application number slice protection
 		if len(line) < 119 {
-			fc.Logger.Printf("line %d: application '%s' has incorrect line length %d", count, applicationNumber, len(line))
+			applicationNumber := ""
+			if len(line) >= 11 {
+				applicationNumber = line[:11]
+			}
+			fc.Logger.Printf("line %d: application '%s' has incorrect line length %d",
+				count, applicationNumber, len(line))
 			continue
 		}
 
+		applicationNumber := line[:11]
 		if fc.Range.ApplicationNumberExists(applicationNumber) {
 			record, err := parseFC19Content(line)
 			if err != nil {
-				fc.Logger.Printf("cannot parse F19 line %d (%s): %v", count, line, err)
+				fc.Logger.Printf("cannot parse FC19 line %d (%s): %v", count, line, err)
 				return err
 			}
 
-			err = addFC19Record(ctx, fc.Tx, id, record, addedAt)
-			if err != nil {
-				fc.Logger.Printf("cannot add F19 record to Database from line %d (%s): %v", count, line, err)
+			if err := addFC19Record(ctx, fc.Tx, id, record, addedAt); err != nil {
+				fc.Logger.Printf("cannot add FC19 record from line %d (%s): %v", count, line, err)
 				return err
 			}
 			added++
 		}
 	}
 
-	err = fc.Db.UpdateFileStatus(ctx, fc.Tx, "IMPORTED", id, time.Now().UTC())
-	if err != nil {
+	if err := r.Err(); err != nil {
+		return err
+	}
+
+	if err := fc.Db.UpdateFileStatus(ctx, fc.Tx, "IMPORTED", id, time.Now().UTC()); err != nil {
 		return err
 	}
 
@@ -89,75 +97,56 @@ func (fc File) ProcessFile(ctx context.Context) error {
 func parseFC19Content(line string) (*FC19Record, error) {
 	data := []rune(line)
 
-	var err error
 	// Application Number
 	tmp := strings.TrimSpace(util.SubstringBeginning(data, 11))
 	record := FC19Record{
 		ApplicationNumber: tmp,
 	}
+
 	// Application Status
 	record.ApplicationStatus = util.ReadNullString(util.Substring(data, 12, 15))
+
 	// Status Creation Date
-	record.StatusCreationDate, err = util.ReadMacaoNullTimestamp(util.Substring(data, 16, 42))
+	ts, err := util.ReadMacaoNullTimestamp(util.Substring(data, 16, 42))
 	if err != nil {
 		return nil, err
 	}
+	record.StatusCreationDate = ts
+
 	// Remote Transmission
 	record.RemoteTransmission = util.ReadNullString(util.Substring(data, 43, 44))
+
 	// Recipient Code Type
 	record.RecipientCodeType = util.ReadNullString(util.Substring(data, 45, 46))
+
 	// Protestor Code Type
 	record.ProtestorCodeType = util.ReadNullString(util.Substring(data, 47, 48))
+
 	// Decision Type Code
 	record.DecisionTypeCode = util.ReadNullString(util.SubstringEnd(data, 49))
 
 	return &record, nil
 }
 
-func CreateApplicationCreatedDateMap(l *logger.Logger, batchId string) (map[string]time.Time, error) {
-	key := fmt.Sprintf("SLMD_MACAOFC19_%s.txt", batchId)
-
-	//Open from S3 (io.ReadCloser)
-	body, err := s3client.Open(context.TODO()), key)
-	if err != nil {
-		// Translate S3 "not found" to our typed error
-		if isS3NotFound(err) {
-			return nil, &s3io.NotFoundError{Key: key}
-		}
-		return nil, err
-	}
-	defer body.Close()
-
-	result := make(map[string]time.Time)
-	r := bufio.NewScanner(body)
-	r.Scan() // skip header
-
-	return result, nil
-}
-
-func isS3NotFound(err error) bool {
-	var nsk *types.NoSuchKey
-	if errors.As(err, &nsk) {
-		return true
-	}
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
-		return apiErr.ErrorCode() == "NoSuchKey"
-	}
-	return false
-}
-
 func addFC19Record(ctx context.Context, tx *sql.Tx, fileId uint, record *FC19Record, addedAt time.Time) error {
 	var id uint
-	err := tx.QueryRowContext(ctx, "INSERT INTO FC19_RECORDS (ID, FILE_ID, APPLICATION_NUMBER, APPLICATION_STATUS, "+
-		"STATUS_CREATION_DATE, REMOTE_TRANSMISSION, RECIPIENT_CODE_TYPE, PROTESTOR_CODE_TYPE, DECISION_TYPE_CODE, "+
-		"CREATED_AT) VALUES (NEXTVAL('FC19_SEQ'), $1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ID",
-		fileId, record.ApplicationNumber, record.ApplicationStatus, record.StatusCreationDate, record.RemoteTransmission,
-		record.RecipientCodeType, record.ProtestorCodeType, record.DecisionTypeCode, addedAt).Scan(&id)
+	err := tx.QueryRowContext(ctx,
+		"INSERT INTO FC19_RECORDS (ID, FILE_ID, APPLICATION_NUMBER, APPLICATION_STATUS, "+
+			"STATUS_CREATION_DATE, REMOTE_TRANSMISSION, RECIPIENT_CODE_TYPE, PROTESTOR_CODE_TYPE, DECISION_TYPE_CODE, "+
+			"CREATED_AT) VALUES (NEXTVAL('FC19_SEQ'), $1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ID",
+		fileId,
+		record.ApplicationNumber,
+		record.ApplicationStatus,
+		record.StatusCreationDate,
+		record.RemoteTransmission,
+		record.RecipientCodeType,
+		record.ProtestorCodeType,
+		record.DecisionTypeCode,
+		addedAt,
+	).Scan(&id)
 
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
