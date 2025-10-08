@@ -1,0 +1,28 @@
+package fc19
+
+import (
+	"errors"
+	"testing"
+
+	"github.com/aws/smithy-go"
+	"github.com/aws/smithy-go/transport/http"
+)
+
+func TestIsS3NotFound_NoSuchKey(t *testing.T) {
+	apiErr := &smithy.GenericAPIError{
+		Code:    "NoSuchKey",
+		Message: "key missing",
+	}
+	if !isS3NotFound(apiErr) {
+		t.Fatalf("expected true for NoSuchKey error")
+	}
+
+	wrapped := &http.ResponseError{Err: apiErr}
+	if !isS3NotFound(wrapped) {
+		t.Fatalf("expected true for wrapped NoSuchKey error")
+	}
+
+	if isS3NotFound(errors.New("boom")) {
+		t.Fatalf("expected false for random error")
+	}
+}
