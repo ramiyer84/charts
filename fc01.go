@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.axa.com/axa-partners-clp/mrt-shared/encryption"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile"
-	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc19"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/util"
 	"github.com/spf13/viper"
 	"strconv"
@@ -99,25 +98,16 @@ func (fc File) ProcessFile(ctx context.Context) error {
 		applicationCreatedDateMap map[string]time.Time
 	)
 
+	// Range filtering is controlled by config, but the companion FC19 map
+	// must be provided by the worker/provider. If it wasn't provided,
+	// we skip range filtering (backward compatible).
 	shouldImportInRange, importDateRangeStart, importDateRangeEnd := util.ShouldImportInTheRange()
-	if shouldImportInRange {
-		applicationCreatedDateMap, err = fc19.CreateApplicationCreatedDateMap(fc.Logger, fc.BatchID)
-		if err != nil {
-			var e *os.PathError
-			if errors.As(err, &e) {
-				if os.IsNotExist(err) {
-					return &FC19FileMissing{
-						FileName: e.Path,
-					}
-				} else {
-					return err
-				}
-			}
-		}
+	if shouldImportInRange && fc.CompanionFC19 != nil {
+		applicationCreatedDateMap = fc.CompanionFC19
+	} else {
+		shouldImportInRange = false
 	}
-	if err != nil {
-		return err
-	}
+
 	addedAt := time.Now().UTC()
 	id, err := fc.Db.AddFile(ctx, fc.Tx, fc.BatchID, fc.Filename, "FC01", addedAt)
 	if err != nil {
@@ -142,13 +132,14 @@ func (fc File) ProcessFile(ctx context.Context) error {
 
 		inRange := false
 		if shouldImportInRange {
-			createdAt, ok := applicationCreatedDateMap[applicationNumber]
-			if ok && !createdAt.Before(*importDateRangeStart) && !createdAt.After(*importDateRangeEnd) {
+			if createdAt, ok := applicationCreatedDateMap[applicationNumber]; ok &&
+				!createdAt.Before(*importDateRangeStart) &&
+				!createdAt.After(*importDateRangeEnd) {
 				inRange = true
 			}
 		}
 
-		if !shouldImportInRange || (shouldImportInRange && inRange) {
+		if !shouldImportInRange || inRange {
 			record, err := parseFC01Content(line)
 			if err != nil {
 				applicationNumber := line[:11]
@@ -170,15 +161,12 @@ func (fc File) ProcessFile(ctx context.Context) error {
 					record.InsuredAddress5.Valid = false
 					record.InsuredAddress5.String = ""
 				}
-
 				if record.InsuredTown.Valid {
 					record.InsuredTown.String = faker.Address().City()
 				}
-
 				if record.ThirdPartyFullName.Valid {
 					record.ThirdPartyFullName.String = faker.Name().Name()
 				}
-
 				if record.ThirdPartyAddress2.Valid || record.ThirdPartyAddress3.Valid || record.ThirdPartyAddress4.Valid || record.ThirdPartyAddress5.Valid {
 					record.ThirdPartyAddress2.Valid = true
 					record.ThirdPartyAddress2.String = faker.Address().StreetAddress()
@@ -189,11 +177,9 @@ func (fc File) ProcessFile(ctx context.Context) error {
 					record.ThirdPartyAddress5.Valid = false
 					record.ThirdPartyAddress5.String = ""
 				}
-
 				if record.ThirdPartyTown.Valid {
 					record.ThirdPartyTown.String = faker.Address().City()
 				}
-
 				if record.ApplicationNotes.Valid {
 					record.ApplicationNotes.String = fmt.Sprintf(fakeNotes[notesCount], record.ApplicationNumber)
 					if notesCount == len(fakeNotes)-1 {
@@ -204,37 +190,29 @@ func (fc File) ProcessFile(ctx context.Context) error {
 				}
 			}
 
-			err = addFC01Record(ctx, fc.Encryption, fc.Tx, id, record, addedAt)
-			if err != nil {
+			if err = addFC01Record(ctx, fc.Encryption, fc.Tx, id, record, addedAt); err != nil {
 				fc.Logger.Printf("line %d: cannot add F01 record to Database line length %d (%s): %v", count, len(line), line, err)
 				if len(record.AgentBrokerNumber) > 5 {
 					fc.Logger.Printf("agent broker number %s", record.AgentBrokerNumber)
 				}
-
 				if len(record.InspectorCode) > 5 {
 					fc.Logger.Printf("inspector code %s", record.InspectorCode)
 				}
-
 				if record.NotUsedCreditor.Valid && len(record.NotUsedCreditor.String) > 5 {
 					fc.Logger.Printf("not used creditor %s", record.NotUsedCreditor.String)
 				}
-
 				if record.AgentPostCode.Valid && len(record.AgentPostCode.String) > 5 {
 					fc.Logger.Printf("agent post code %s", record.AgentPostCode.String)
 				}
-
 				if record.InsuredPostCode.Valid && len(record.InsuredPostCode.String) > 5 {
 					fc.Logger.Printf("insured post code %s", record.InsuredPostCode.String)
 				}
-
 				if record.ThirdPartyPostCode.Valid && len(record.ThirdPartyPostCode.String) > 5 {
 					fc.Logger.Printf("third party post code %s", record.ThirdPartyPostCode.String)
 				}
-
 				if record.CFFEditorNumber.Valid && len(record.CFFEditorNumber.String) > 5 {
 					fc.Logger.Printf("CFF editor number %s", record.CFFEditorNumber.String)
 				}
-
 				if record.CBPCountryCode.Valid && len(record.CBPCountryCode.String) > 5 {
 					fc.Logger.Printf("CBP country code %s", record.CBPCountryCode.String)
 				}
@@ -244,8 +222,7 @@ func (fc File) ProcessFile(ctx context.Context) error {
 		}
 	}
 
-	err = fc.Db.UpdateFileStatus(ctx, fc.Tx, "IMPORTED", id, time.Now().UTC())
-	if err != nil {
+	if err = fc.Db.UpdateFileStatus(ctx, fc.Tx, "IMPORTED", id, time.Now().UTC()); err != nil {
 		return err
 	}
 
@@ -396,84 +373,72 @@ func addFC01Record(ctx context.Context, enc encryption.Client, tx *sql.Tx, fileI
 			return err
 		}
 	}
-
 	if record.InsuredAddress1.Valid {
 		record.InsuredAddress1.String, err = enc.Encrypt(record.InsuredAddress1.String)
 		if err != nil {
 			return err
 		}
 	}
-
 	if record.InsuredAddress2.Valid {
 		record.InsuredAddress2.String, err = enc.Encrypt(record.InsuredAddress2.String)
 		if err != nil {
 			return err
 		}
 	}
-
 	if record.InsuredAddress3.Valid {
 		record.InsuredAddress3.String, err = enc.Encrypt(record.InsuredAddress3.String)
 		if err != nil {
 			return err
 		}
 	}
-
 	if record.InsuredAddress4.Valid {
 		record.InsuredAddress4.String, err = enc.Encrypt(record.InsuredAddress4.String)
 		if err != nil {
 			return err
 		}
 	}
-
 	if record.InsuredAddress5.Valid {
 		record.InsuredAddress5.String, err = enc.Encrypt(record.InsuredAddress5.String)
 		if err != nil {
 			return err
 		}
 	}
-
 	if record.InsuredTown.Valid {
 		record.InsuredTown.String, err = enc.Encrypt(record.InsuredTown.String)
 		if err != nil {
 			return err
 		}
 	}
-
 	if record.ThirdPartyFullName.Valid {
 		record.ThirdPartyFullName.String, err = enc.Encrypt(record.ThirdPartyFullName.String)
 		if err != nil {
 			return err
 		}
 	}
-
 	if record.ThirdPartyAddress2.Valid {
 		record.ThirdPartyAddress2.String, err = enc.Encrypt(record.ThirdPartyAddress2.String)
 		if err != nil {
 			return err
 		}
 	}
-
 	if record.ThirdPartyAddress3.Valid {
 		record.ThirdPartyAddress3.String, err = enc.Encrypt(record.ThirdPartyAddress3.String)
 		if err != nil {
 			return err
 		}
 	}
-
 	if record.ThirdPartyAddress4.Valid {
 		record.ThirdPartyAddress4.String, err = enc.Encrypt(record.ThirdPartyAddress4.String)
 		if err != nil {
 			return err
 		}
 	}
-
 	if record.ThirdPartyAddress5.Valid {
 		record.ThirdPartyAddress5.String, err = enc.Encrypt(record.ThirdPartyAddress5.String)
 		if err != nil {
 			return err
 		}
 	}
-
 	if record.ThirdPartyTown.Valid {
 		record.ThirdPartyTown.String, err = enc.Encrypt(record.ThirdPartyTown.String)
 		if err != nil {
@@ -503,7 +468,6 @@ func addFC01Record(ctx context.Context, enc encryption.Client, tx *sql.Tx, fileI
 		record.ThirdPartyAddress3, record.ThirdPartyAddress4, record.ThirdPartyAddress5, record.ThirdPartyPostCode,
 		record.ThirdPartyTown, record.ThirdPartyCountryCode, record.DecisionApplicationLevel, record.DecisionCreatedAt,
 		record.DecisionUpdatedAt, record.CFFEditorNumber, record.LenderEmail, record.CBPCountryCode, addedAt).Scan(&id)
-
 	if err != nil {
 		return err
 	}
