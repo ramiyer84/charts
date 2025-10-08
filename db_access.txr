@@ -1,0 +1,406 @@
+package dao
+
+import (
+	"context"
+	"database/sql"
+	"github.axa.com/axa-partners-clp/mrt-shared/db"
+	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/logger"
+	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/util"
+	"time"
+)
+
+type DB struct {
+	*db.Client
+	l *logger.Logger
+}
+
+type OldBatchError struct {
+	batchId string
+}
+
+func (m OldBatchError) Error() string {
+	return "batch '" + m.batchId + "' cannot be processed: newer batch is already getting processed"
+}
+
+func CreateClient(c *db.Client, l *logger.Logger) *DB {
+	return &DB{
+		c,
+		l,
+	}
+}
+
+func (db DB) AddBatchIfNecessary(ctx context.Context, id string, addedAt time.Time) error {
+	var batchId string
+
+	tx, err := db.BeginTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = tx.QueryRowContext(ctx, "SELECT batch_id FROM SELMED_BATCHES WHERE batch_ID = $1", id).Scan(&batchId)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return err
+		} else {
+			_, err := tx.ExecContext(ctx, "INSERT INTO SELMED_BATCHES (BATCH_ID, CREATED_AT, STATUS) VALUES ($1, $2, 'LOADING')", id, addedAt)
+			if err != nil {
+				return err
+			}
+
+			_, err = tx.ExecContext(ctx, "INSERT INTO SELMED_BATCHES_HISTORY (BATCH_ID, MODIFIED_AT, STATUS) VALUES ($1, $2, 'LOADING')", id, addedAt)
+			if err != nil {
+				return err
+			}
+			err = tx.Commit()
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (db DB) DropIndexes(ctx context.Context) error {
+	session := db.GetConnection()
+
+	db.l.Print("drop index I_LAST_DECISION")
+	_, err := session.ExecContext(ctx, "DROP INDEX IF EXISTS I_LAST_DECISION")
+	if err != nil {
+		return err
+	}
+
+	db.l.Print("drop index I_FC10_COVER_NUMBER")
+	_, err = session.ExecContext(ctx, "DROP INDEX IF EXISTS I_FC10_COVER_NUMBER")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db DB) CompleteBatchIfPossible(ctx context.Context, batchId string) error {
+	var count int
+
+	session := db.GetConnection()
+
+	tx, err := db.BeginTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = tx.QueryRowContext(ctx, "SELECT count(*) FROM SELMED_FILES WHERE BATCH_ID = $1", batchId).Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	if count == 14 {
+		completedAt := time.Now().UTC()
+		err = db.UpdateBatchStatus(ctx, tx, batchId, "IMPORTED", completedAt)
+		if err != nil {
+			db.l.Printf("cannot upfate batch status: %v", err)
+			return err
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			db.l.Printf("cannot commit transaction when completing batch: %v", err)
+			return err
+		}
+
+		db.l.Print("updating materialized view fc01_current")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc01_current")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc02")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc02")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc05")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc05")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc06")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc06")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc10")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc10")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc10_latest")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc10_latest")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc12")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc12")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc13")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc13")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc19")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc19")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc19_latest")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc19_latest")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc21")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc21")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc23")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc23")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc24")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc24")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc26")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc26")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc27")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc27")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("updating materialized view fc28")
+		_, err = session.ExecContext(ctx, "REFRESH MATERIALIZED VIEW fc28")
+		if err != nil {
+			return err
+		}
+		db.l.Print("all materialized views are updated")
+
+		db.l.Print("creating index i_last_decision")
+		_, err = session.ExecContext(ctx, "CREATE INDEX IF NOT EXISTS I_LAST_DECISION ON FC10_RECORDS(APPLICATION_NUMBER, LOAN_ID, COVER_NUMBER)")
+		if err != nil {
+			return err
+		}
+
+		db.l.Print("creating index I_FC10_COVER_NUMBER")
+		_, err = session.ExecContext(ctx, "CREATE INDEX I_FC10_COVER_NUMBER ON FC10_LATEST(COVER_NUMBER)")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (db DB) UpdateBatchStatus(ctx context.Context, tx *sql.Tx, batchId string, status string, updatedAt time.Time) error {
+	var existingStatus string
+	err := tx.QueryRowContext(ctx, "SELECT STATUS FROM SELMED_BATCHES WHERE BATCH_ID = $1", batchId).Scan(&existingStatus)
+	if err != nil {
+		return err
+	}
+
+	if status != existingStatus {
+		_, err = tx.ExecContext(ctx, "UPDATE SELMED_BATCHES SET STATUS = $3, LAST_UPDATED_AT = $1 WHERE BATCH_ID = $2", updatedAt, batchId, status)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.ExecContext(ctx, "INSERT INTO SELMED_BATCHES_HISTORY (BATCH_ID, MODIFIED_AT, STATUS) VALUES ($1, $2, $3)", batchId, updatedAt, status)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (db DB) CheckIfThereAreIncompleteBatches(ctx context.Context, batchId string) ([]string, error) {
+	var b string
+	var result []string = []string{}
+
+	currentBatchCreatedAt, err := util.ConvertBatchCreationDateTime(batchId)
+	if err != nil {
+		return result, err
+	}
+
+	rows, err := db.GetConnection().QueryContext(ctx, "SELECT batch_id FROM SELMED_BATCHES WHERE BATCH_ID != $1 AND STATUS NOT IN ('IMPORTED', 'CANCELLED')", batchId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		err = rows.Scan(&b)
+		if err != nil {
+			return result, err
+		}
+
+		batchCreatedAt, err := util.ConvertBatchCreationDateTime(b)
+		if err != nil {
+			return result, err
+		}
+
+		if batchCreatedAt.After(currentBatchCreatedAt) {
+			return result, &OldBatchError{
+				batchId: batchId,
+			}
+		}
+		result = append(result, b)
+	}
+	return result, nil
+}
+
+func (db DB) CancelIncompleteBatch(ctx context.Context, batchId string) error {
+	tx, err := db.BeginTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.QueryContext(ctx, "SELECT ID FROM SELMED_FILES WHERE batch_id = $1", batchId)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var (
+		file_id uint
+		fileIds []uint
+	)
+	fileIds = make([]uint, 0)
+	for rows.Next() {
+		err = rows.Scan(&file_id)
+		if err != nil {
+			return err
+		}
+		fileIds = append(fileIds, file_id)
+	}
+
+	err = rows.Close()
+	if err != nil {
+		return err
+	}
+
+	cancelledAt := time.Now().UTC()
+	for _, id := range fileIds {
+		err = db.UpdateFileStatus(ctx, tx, "CANCELLED", id, cancelledAt)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = db.UpdateBatchStatus(ctx, tx, batchId, "CANCELLED", cancelledAt)
+	if err != nil {
+		return err
+	}
+	tx.Commit()
+
+	return nil
+}
+
+func (db DB) AddFile(ctx context.Context, tx *sql.Tx, batchId string, name string, fileType string, addedAt time.Time) (uint, error) {
+	var id uint
+	err := tx.QueryRowContext(ctx, "INSERT INTO SELMED_FILES (ID, BATCH_ID, NAME, SELMED_TABLE_NAME, CREATED_AT, STATUS) VALUES (NEXTVAL('SELMED_FILES_SEQ'), $1, $2, $3, $4, 'LOADING') RETURNING ID", batchId, name, fileType, addedAt).Scan(&id)
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = tx.ExecContext(ctx, "INSERT INTO SELMED_FILES_HISTORY (ID, MODIFIED_AT, STATUS) VALUES ($1, $2, 'LOADING')", id, addedAt)
+	if err != nil {
+		return 0, err
+	}
+
+	return id, nil
+}
+
+func (db DB) UpdateFileStatus(ctx context.Context, tx *sql.Tx, status string, id uint, modifiedAt time.Time) error {
+	_, err := tx.ExecContext(ctx, "UPDATE SELMED_FILES SET STATUS = $1, LAST_UPDATED_AT = $2 WHERE ID = $3", status, modifiedAt, id)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, "INSERT INTO SELMED_FILES_HISTORY (ID, MODIFIED_AT, STATUS) VALUES ($1, $2, $3)", id, modifiedAt, status)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db DB) CheckIfFileLoaded(ctx context.Context, tx *sql.Tx, batchId string, tableName string) (bool, error) {
+	var id int
+	err := tx.QueryRowContext(ctx, "SELECT id FROM SELMED_FILES WHERE BATCH_ID = $1 AND STATUS = 'IMPORTED' AND SELMED_TABLE_NAME = $2", batchId, tableName).Scan(&id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+
+	if id > 0 {
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
+func (db DB) LoadApplications(ctx context.Context, tx *sql.Tx, batchId string) (map[string]bool, map[int64]bool, map[int64]bool, error) {
+	applicationNumbers := make(map[string]bool)
+	insuredIds := make(map[int64]bool)
+	agentIds := make(map[int64]bool)
+
+	rows, err := tx.QueryContext(ctx, "SELECT application_number, insured_id, agent_id FROM FC01_RECORDS R INNER JOIN SELMED_FILES S ON R.FILE_ID = S.ID WHERE S.BATCH_ID = $1 AND STATUS = 'IMPORTED' AND SELMED_TABLE_NAME = 'FC01'", batchId)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			applicationNumber string
+			insuredId         int64
+			agentId           int64
+		)
+
+		err = rows.Scan(&applicationNumber, &insuredId, &agentId)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		applicationNumbers[applicationNumber] = true
+		insuredIds[insuredId] = true
+		agentIds[agentId] = true
+	}
+
+	return applicationNumbers, insuredIds, agentIds, nil
+}
