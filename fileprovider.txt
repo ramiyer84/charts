@@ -1,0 +1,47 @@
+package provider
+
+import (
+	"context"
+	"io"
+	"os"
+	"path/filepath"
+)
+
+// FileItem represents a single file entry and satisfies the worker.Item interface.
+type FileItem string
+
+// Name returns the base name of the file.
+func (i FileItem) Name() string {
+	return string(i)
+}
+
+// FileProvider implements the worker.Provider interface for local filesystem access.
+type FileProvider struct {
+	root    string
+	pattern string
+}
+
+// NewFileProvider creates a new FileProvider for the given directory and file pattern.
+func NewFileProvider(root, pattern string) *FileProvider {
+	return &FileProvider{root: root, pattern: pattern}
+}
+
+// List scans the directory and returns a list of matching file items.
+func (p *FileProvider) List(_ context.Context) ([]FileItem, error) {
+	matches, err := filepath.Glob(filepath.Join(p.root, p.pattern))
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]FileItem, 0, len(matches))
+	for _, match := range matches {
+		items = append(items, FileItem(filepath.Base(match)))
+	}
+	return items, nil
+}
+
+// Open opens a file for reading and returns an io.ReadCloser.
+func (p *FileProvider) Open(_ context.Context, item FileItem) (io.ReadCloser, error) {
+	fullPath := filepath.Join(p.root, item.Name())
+	return os.Open(fullPath)
+}
