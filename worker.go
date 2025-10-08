@@ -2,218 +2,198 @@ package worker
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"io"
 
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/dao"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile"
-	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/logger"
-
-	// FC processors
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc01"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc02"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc05"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc06"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc10"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc12"
-	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc18"
+	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc13"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc19"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc21"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc23"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc24"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc26"
+	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc27"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc28"
+	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/logger"
+	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/util"
 
-	// shared encryption client
 	"github.axa.com/axa-partners-clp/mrt-shared/encryption"
 )
 
-//
-// Interfaces (kept where used, per Igor)
-//
+// ---- Interfaces and deps ----
 
+// Item is a handle to a single source object (file, S3 key, etc.).
 type Item interface{ Name() string }
 
-// Provider lists items and opens readers for them (fs/S3/etc.).
+// Provider supplies the list of items and opens a reader for a given item.
 type Provider interface {
-	List(ctx context.Context) ([]string, error)
-	Open(ctx context.Context, name string) (io.ReadCloser, error)
-	OnSuccess(ctx context.Context, name string) error
-	OnError(ctx context.Context, name string, cause error) error
+	List(ctx context.Context) ([]Item, error)
+	Open(ctx context.Context, it Item) (io.ReadCloser, error)
 }
 
-//
-// Concrete dependencies the worker needs
-//
-
+// Deps are shared across all processors.
 type Deps struct {
 	DB          *dao.DB
 	Logger      *logger.Logger
 	Encryption  encryption.Client
 	BatchID     string
-	ImportRange inputfile.ImportRange // lightweight Start/End window (from config)
+	ImportRange inputfile.ImportRange // config window (start/end strings)
 }
 
-//
-// Worker wiring
-//
-
+// Worker wires provider → processors and owns per-file transactions.
 type Worker struct {
 	prov Provider
 	deps Deps
 }
 
-func New(prov Provider, deps Deps) *Worker {
-	return &Worker{prov: prov, deps: deps}
-}
+func New(p Provider, d Deps) *Worker { return &Worker{prov: p, deps: d} }
 
-//
-// Orchestration
-//
+// ---- Orchestration ----
 
 func (w *Worker) Run(ctx context.Context) error {
-	names, err := w.prov.List(ctx)
+	items, err := w.prov.List(ctx)
 	if err != nil {
-		return fmt.Errorf("list input items: %w", err)
+		return fmt.Errorf("list: %w", err)
+	}
+	if len(items) == 0 {
+		w.deps.Logger.Print("no files to process")
+		return nil
 	}
 
-	for _, name := range names {
-		if err := w.processOne(ctx, name); err != nil {
-			_ = w.prov.OnError(ctx, name, err) // best-effort
+	for _, it := range items {
+		if err := w.processOne(ctx, it.Name()); err != nil {
 			return err
 		}
-		if e := w.prov.OnSuccess(ctx, name); e != nil {
-			w.deps.Logger.Printf("post-success action failed for %s: %v", name, e)
-		}
 	}
-
 	return nil
 }
 
 func (w *Worker) processOne(ctx context.Context, name string) error {
-	// Open content from provider
-	rc, err := w.prov.Open(ctx, name)
+	// Open content
+	rc, err := w.prov.Open(ctx, fileItem(name))
 	if err != nil {
 		return fmt.Errorf("open %s: %w", name, err)
 	}
 	defer rc.Close()
 
-	// Per-file transaction
-	tx, err := w.deps.DB.BeginTx(ctx, &sql.TxOptions{})
+	// Per-file transaction (dao.DB exposes BeginTransaction)
+	tx, err := w.deps.DB.BeginTransaction(ctx)
 	if err != nil {
-		return fmt.Errorf("begin tx for %s: %w", name, err)
+		return fmt.Errorf("begin tx: %w", err)
 	}
+	defer tx.Rollback()
 
-	// Common per-file context passed to FC processors
+	// Range cache for this file (used by FC19)
+	rng := &inputfile.Range{}
+
+	// Build the common SourceFile context
 	sf := &inputfile.SourceFile{
-		Db:          w.deps.DB,
-		Tx:          tx,
-		Logger:      w.deps.Logger,
-		Encryption:  w.deps.Encryption,
-		BatchID:     w.deps.BatchID,
-		Filename:    name,
-		Reader:      rc,
-		ImportRange: w.deps.ImportRange,
+		BatchID:         w.deps.BatchID,
+		Filename:        name,
+		OriginalFileName: name,
+		Encryption:      w.deps.Encryption,
+		Db:              w.deps.DB,
+		Tx:              tx,
+		Logger:          w.deps.Logger,
+		Range:           rng, // NOTE: cache pointer, not ImportRange
+		Reader:          rc,
 	}
 
-	// Route to the correct FC processor
 	switch route(name) {
 	case "FC01":
 		f := fc01.File{SourceFile: sf}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc01: %w", err)
+			return fmt.Errorf("fc01: %w", err)
 		}
 	case "FC02":
 		f := fc02.File{SourceFile: sf}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc02: %w", err)
+			return fmt.Errorf("fc02: %w", err)
 		}
 	case "FC05":
 		f := fc05.File{SourceFile: sf}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc05: %w", err)
+			return fmt.Errorf("fc05: %w", err)
 		}
 	case "FC06":
 		f := fc06.File{SourceFile: sf}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc06: %w", err)
+			return fmt.Errorf("fc06: %w", err)
 		}
 	case "FC10":
 		f := fc10.File{SourceFile: sf}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc10: %w", err)
+			return fmt.Errorf("fc10: %w", err)
 		}
 	case "FC12":
 		f := fc12.File{SourceFile: sf}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc12: %w", err)
+			return fmt.Errorf("fc12: %w", err)
 		}
-	case "FC18":
-		f := fc18.File{SourceFile: sf}
+	case "FC13":
+		f := fc13.File{SourceFile: sf}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc18: %w", err)
+			return fmt.Errorf("fc13: %w", err)
 		}
 	case "FC19":
-		// FC19 ONLY: build & validate runtime cache and inject it
-		rng := &inputfile.Range{}
-		if err := rng.Validate(ctx, w.deps.DB, tx, w.deps.BatchID); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("fc19: range validate failed: %w", err)
-		}
-		f := fc19.File{
-			SourceFile: sf,
-			Range:      rng,
-		}
+		// Original range.Validate had no return; call it for side-effects.
+		rng.Validate(ctx, w.deps.DB, tx, w.deps.BatchID)
+		f := fc19.File{SourceFile: sf, Range: rng}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc19: %w", err)
+			return fmt.Errorf("fc19: %w", err)
 		}
 	case "FC21":
 		f := fc21.File{SourceFile: sf}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc21: %w", err)
+			return fmt.Errorf("fc21: %w", err)
 		}
 	case "FC23":
 		f := fc23.File{SourceFile: sf}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc23: %w", err)
+			return fmt.Errorf("fc23: %w", err)
 		}
 	case "FC24":
 		f := fc24.File{SourceFile: sf}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc24: %w", err)
+			return fmt.Errorf("fc24: %w", err)
 		}
 	case "FC26":
 		f := fc26.File{SourceFile: sf}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc26: %w", err)
+			return fmt.Errorf("fc26: %w", err)
+		}
+	case "FC27":
+		f := fc27.File{SourceFile: sf}
+		if err := f.ProcessFile(ctx); err != nil {
+			return fmt.Errorf("fc27: %w", err)
 		}
 	case "FC28":
 		f := fc28.File{SourceFile: sf}
 		if err := f.ProcessFile(ctx); err != nil {
-			_ = tx.Rollback(); return fmt.Errorf("fc28: %w", err)
+			return fmt.Errorf("fc28: %w", err)
 		}
 	default:
-		_ = tx.Rollback()
-		return fmt.Errorf("unsupported file type for %s", name)
+		return fmt.Errorf("unknown file type for %q", name)
 	}
 
-	// Commit per-file transaction
+	// Per-file commit
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit %s: %w", name, err)
+		return fmt.Errorf("commit: %w", err)
 	}
 	return nil
 }
 
-//
-// If you already have this in internal/worker/route.go, delete this copy.
-//
+// Minimal helper to adapt name→Item for Open
+type fileItem string
 
-func route(name string) string {
-	for i := 0; i < len(name); i++ {
-		if name[i] == '_' || name[i] == '.' {
-			return name[:i]
-		}
-	}
-	return name
-}
+func (f fileItem) Name() string { return string(f) }
+
+// Same routing helper you had
+func route(name string) string { return util.Route(name) }
