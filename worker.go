@@ -22,32 +22,27 @@ import (
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc27"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/inputfile/fc28"
 	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/logger"
-	"github.axa.com/axa-partners-clp/selmed-migration-tool/internal/util"
 
 	"github.axa.com/axa-partners-clp/mrt-shared/encryption"
 )
 
 // ---- Interfaces and deps ----
 
-// Item is a handle to a single source object (file, S3 key, etc.).
 type Item interface{ Name() string }
 
-// Provider supplies the list of items and opens a reader for a given item.
 type Provider interface {
 	List(ctx context.Context) ([]Item, error)
 	Open(ctx context.Context, it Item) (io.ReadCloser, error)
 }
 
-// Deps are shared across all processors.
 type Deps struct {
 	DB          *dao.DB
 	Logger      *logger.Logger
 	Encryption  encryption.Client
 	BatchID     string
-	ImportRange inputfile.ImportRange // config window (start/end strings)
+	ImportRange inputfile.ImportRange
 }
 
-// Worker wires provider → processors and owns per-file transactions.
 type Worker struct {
 	prov Provider
 	deps Deps
@@ -83,27 +78,27 @@ func (w *Worker) processOne(ctx context.Context, name string) error {
 	}
 	defer rc.Close()
 
-	// Per-file transaction (dao.DB exposes BeginTransaction)
+	// Per-file transaction
 	tx, err := w.deps.DB.BeginTransaction(ctx)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Range cache for this file (used by FC19)
+	// Range cache (used by FC19)
 	rng := &inputfile.Range{}
 
-	// Build the common SourceFile context
+	// Common SourceFile
 	sf := &inputfile.SourceFile{
-		BatchID:         w.deps.BatchID,
-		Filename:        name,
+		BatchID:          w.deps.BatchID,
+		Filename:         name,
 		OriginalFileName: name,
-		Encryption:      w.deps.Encryption,
-		Db:              w.deps.DB,
-		Tx:              tx,
-		Logger:          w.deps.Logger,
-		Range:           rng, // NOTE: cache pointer, not ImportRange
-		Reader:          rc,
+		Encryption:       w.deps.Encryption,
+		Db:               w.deps.DB,
+		Tx:               tx,
+		Logger:           w.deps.Logger,
+		Range:            rng,
+		Reader:           rc,
 	}
 
 	switch route(name) {
@@ -143,8 +138,9 @@ func (w *Worker) processOne(ctx context.Context, name string) error {
 			return fmt.Errorf("fc13: %w", err)
 		}
 	case "FC19":
-		// Original range.Validate had no return; call it for side-effects.
+		// Validate range once (method returns no error; acts by side-effects)
 		rng.Validate(ctx, w.deps.DB, tx, w.deps.BatchID)
+
 		f := fc19.File{SourceFile: sf, Range: rng}
 		if err := f.ProcessFile(ctx); err != nil {
 			return fmt.Errorf("fc19: %w", err)
@@ -183,17 +179,14 @@ func (w *Worker) processOne(ctx context.Context, name string) error {
 		return fmt.Errorf("unknown file type for %q", name)
 	}
 
-	// Per-file commit
+	// Commit file work
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
 	return nil
 }
 
-// Minimal helper to adapt name→Item for Open
+// helper to adapt name → Item for Open
 type fileItem string
 
 func (f fileItem) Name() string { return string(f) }
-
-// Same routing helper you had
-func route(name string) string { return util.Route(name) }
