@@ -1,0 +1,59 @@
+package file_test
+
+import (
+	"context"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	fileprov "github.axa.com/axa-partners-clp/selmed-migration-tool/internal/provider/file"
+)
+
+func TestFileProvider_ListAndOpen(t *testing.T) {
+	t.Parallel()
+
+	// temp dir with three files, two match the pattern
+	dir := t.TempDir()
+	files := []struct {
+		name string
+		body string
+	}{
+		{"SLMD_MACAOFC01_20240101.txt", "hello-01"},
+		{"SLMD_MACAOFC19_20240101.txt", "hello-19"},
+		{"IGNORED.md", "nope"},
+	}
+	for _, f := range files {
+		if err := os.WriteFile(filepath.Join(dir, f.name), []byte(f.body), 0o644); err != nil {
+			t.Fatalf("write %s: %v", f.name, err)
+		}
+	}
+
+	// pattern picks only .txt
+	p := fileprov.New(dir, "*.txt")
+
+	items, err := p.List(context.Background())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items, got %d (%v)", len(items), items)
+	}
+
+	// open first item and read content
+	rc, err := p.Open(context.Background(), items[0].Name())
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer rc.Close()
+
+	b, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	s := string(b)
+	if !strings.HasPrefix(s, "hello-") {
+		t.Fatalf("unexpected body %q", s)
+	}
+}
