@@ -1,0 +1,28 @@
+WITH app_level AS (
+  SELECT application_number, CAST(application_aeras_level AS varchar(10)) AS app_level
+  FROM [EW_Temp_SGP-11850_Aeras_Extract_App_Level]
+),
+apps_with_faulty AS (
+  SELECT DISTINCT l.application_number
+  FROM [EW_Temp_SGP-11850_Aeras_Extract_Loan_Level] l
+  LEFT JOIN app_level a ON a.application_number = l.application_number
+  WHERE a.app_level IS NULL          -- no app-level row
+     OR a.app_level <> l.dms_aeras_level
+)
+SELECT
+  l.application_number,
+  l.macao_loan_id,
+  l.loan_id,
+  a.app_level                                         AS should_have_been_aeras_level,
+  l.dms_aeras_level                                   AS current_dms_aeras_level,
+  CASE 
+    WHEN a.app_level IS NULL THEN 'NO_APP_LEVEL'
+    WHEN l.dms_aeras_level = a.app_level THEN 'OK'
+    ELSE 'FAULTY'
+  END                                                 AS status_vs_app_level
+FROM [EW_Temp_SGP-11850_Aeras_Extract_Loan_Level] l
+JOIN apps_with_faulty f
+  ON f.application_number = l.application_number
+LEFT JOIN app_level a
+  ON a.application_number = l.application_number
+ORDER BY l.application_number, l.loan_id;
