@@ -1,0 +1,35 @@
+SELECT 
+    f.application_number,
+    f.loan_id AS fc02_loan_id,
+    f.loan_number AS fc02_loan_number,
+    f.rpp AS fc02_rpp,
+    f.loan_capital_amount AS fc02_capital_amount,
+    f.loan_duration_months AS fc02_duration_months,
+
+    s.loan_id AS sf_loan_id,
+    s.macao_loan_id,
+    s.loan_number AS sf_loan_number,
+    s.loan_duration AS sf_duration,
+    s.loan_amount AS sf_loan_amount,
+    s.scheme_name AS sf_scheme_name,
+
+    CASE 
+        WHEN s.loan_id IS NULL THEN FALSE
+        WHEN f.loan_capital_amount = s.loan_amount
+         AND f.rpp = s.scheme_name THEN TRUE
+        ELSE FALSE
+    END AS is_matched,
+
+    CASE 
+        WHEN s.loan_id IS NULL THEN 'No loan in MRT'
+        WHEN f.loan_capital_amount <> s.loan_amount THEN 'Amount mismatch'
+        WHEN f.rpp <> s.scheme_name THEN 'Scheme mismatch'
+        ELSE 'All match'
+    END AS matching_comments
+
+FROM fc02_records f
+LEFT JOIN sf_loans s 
+    ON s.macao_loan_id = f.loan_id
+-- optionally also match by application number or loan number:
+-- AND s.loan_number = f.loan_number
+ORDER BY f.application_number, f.loan_id;
