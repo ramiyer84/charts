@@ -3,8 +3,8 @@ WITH mrt AS (
       n.applicationfilefilenumber      AS application_number,
       n.loanid,
       MIN(c.cover_id)                  AS mrt_cover_id,
-      MIN(c.name)                      AS mrt_name,
-      MIN(c.cover_type)                AS mrt_cover_type
+      MIN(c.cover_type)                AS mrt_name,
+      MIN(c.macao_cover_id)            AS macao_cover_id
   FROM temp.dms_macao_coverid_isnull n
   JOIN delta.dms_covers c
     ON n.loanid = c.loan_id
@@ -16,7 +16,7 @@ macao AS (
   SELECT
       c.application_number,
       n.loanid,
-      MIN(c.cover_id)                  AS macao_cover_id,
+      MIN(c.loan_id)                   AS macao_loan_id,
       MIN(c.cover_number)              AS macao_cover_number,
       MIN(c.cover_type)                AS macao_cover_type
   FROM temp.dms_macao_coverid_isnull n
@@ -34,11 +34,11 @@ SELECT
     m.loanid,
     mrt.mrt_cover_id,
     mrt.mrt_name,
-    mrt.mrt_cover_type,
-    macao.macao_cover_id,
-    macao.macao_cover_number,
-    macao.macao_cover_type
+    mrt.macao_cover_id,
+    m.macao_loan_id,
+    m.macao_cover_number,
+    m.macao_cover_type
 FROM mrt
 JOIN macao m
   ON m.loanid = mrt.loanid
- AND m.application_number = mrt.application_number;  -- drop this line if you only want to match on loanid
+ AND m.application_number = mrt.application_number;
