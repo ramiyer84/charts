@@ -1,44 +1,41 @@
-WITH mrt AS (
-  SELECT
-      n.applicationfilefilenumber      AS application_number,
-      n.loanid,
-      MIN(c.cover_id)                  AS mrt_cover_id,
-      MIN(c.cover_type)                AS mrt_name,
-      MIN(c.macao_cover_id)            AS macao_cover_id
-  FROM temp.dms_macao_coverid_isnull n
-  JOIN delta.dms_covers c
-    ON n.loanid = c.loan_id
-  WHERE n.comment = 'Decision present to migrate'
-  GROUP BY n.applicationfilefilenumber, n.loanid
-  HAVING COUNT(c.cover_type) = 1
-),
-macao AS (
-  SELECT
-      c.application_number,
-      n.loanid,
-      MIN(c.loan_id)                   AS macao_loan_id,
-      MIN(c.cover_number)              AS macao_cover_number,
-      MIN(c.cover_type)                AS macao_cover_type
-  FROM temp.dms_macao_coverid_isnull n
-  JOIN delta.sf_loans sfl
-    ON sfl.loan_id = n.loanid
-  JOIN fc05_records c
-    ON sfl.macao_loan_id = c.loan_id
-   AND n.applicationfilefilenumber = c.application_number
-  WHERE n.comment = 'Decision present to migrate'
-  GROUP BY c.application_number, n.loanid
-  HAVING COUNT(c.cover_type) = 1
-)
 SELECT
-    m.application_number,
-    m.loanid,
-    mrt.mrt_cover_id,
-    mrt.mrt_name,
-    mrt.macao_cover_id,
-    m.macao_loan_id,
-    m.macao_cover_number,
-    m.macao_cover_type
-FROM mrt
-JOIN macao m
-  ON m.loanid = mrt.loanid
- AND m.application_number = mrt.application_number;
+    f.application_number,
+    f.loan_id               AS fc02_loan_id,
+    f.loan_number           AS fc02_loan_number,
+    f.rpp                   AS fc02_rpp,
+    f.loan_capital_amount   AS fc02_capital_amount,
+    f.loan_duration_months  AS fc02_duration_months,
+    s.loan_id               AS sf_loan_id,
+    s.macao_loan_id,
+    s.loan_number           AS sf_loan_number,
+    s.loan_duration         AS sf_duration,
+    s.loan_amount           AS sf_loan_amount,
+    s.scheme_name           AS sf_scheme_name,
+
+    CASE
+        WHEN s.loan_id IS NULL THEN FALSE
+        WHEN f.loan_capital_amount = s.loan_amount
+         AND f.loan_duration_months = s.loan_duration
+         AND f.rpp = s.scheme_name THEN TRUE
+        ELSE FALSE
+    END AS is_matched,
+
+    CASE
+        WHEN f.application_number < '2021A024046' THEN 'P1 matching'
+        WHEN s.loan_id IS NULL THEN 'No loan in MRT'
+        WHEN f.loan_capital_amount <> s.loan_amount
+             AND f.loan_duration_months <> s.loan_duration THEN 'Loan amount & duration mismatch'
+        WHEN f.loan_capital_amount <> s.loan_amount THEN 'Loan amount mismatch'
+        WHEN f.loan_duration_months <> s.loan_duration THEN 'Loan duration mismatch'
+        WHEN f.rpp <> s.scheme_name THEN 'Scheme mismatch'
+        ELSE 'All match'
+    END AS matching_comments
+
+FROM fc02_records f
+LEFT JOIN delta.sf_loans s
+    ON s.macao_loan_id = f.loan_id
+   AND s.loan_number = f.loan_number
+-- optionally also match by application number if needed
+--   AND s.application_number = f.application_number
+WHERE f.application_number >= '2021A024046'  -- filter out Phase 1 from the main result
+ORDER BY f.application_number, f.loan_id;
