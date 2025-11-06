@@ -131,3 +131,38 @@ SELECT DISTINCT
 FROM base b
 JOIN fc05_pe_only p
   ON p.application_number = b.application_number;
+
+
+
+
+
+WITH base AS (
+  SELECT DISTINCT
+      UPPER(LTRIM(RTRIM(c.applicationfilefilenumber))) AS app_key,
+      sfl.loan_id AS mrt_loan_id
+  FROM temp.dms_macao_coverid_isnull c
+  JOIN delta.sf_applications sfa
+    ON c.applicationfilefilenumber = sfa.application_number
+  JOIN delta.sf_loans sfl
+    ON c.loanid = sfl.loan_id
+   AND sfa.opportunity_id = sfl.application_id
+  WHERE c.id IS NOT NULL
+    AND sfl.macao_loan_id IS NULL
+),
+fc05_pe_only AS (
+  -- FC05 loans that have exactly one cover and it’s 090
+  SELECT
+      UPPER(LTRIM(RTRIM(application_number))) AS app_key,
+      loan_id AS fc_loan_id
+  FROM fc05_records
+  GROUP BY UPPER(LTRIM(RTRIM(application_number))), loan_id
+  HAVING COUNT(*) = 1 AND MAX(cover_type) = '090'
+)
+SELECT DISTINCT
+    b.app_key AS application_number,
+    b.mrt_loan_id,
+    p.fc_loan_id,
+    '090' AS cover_type
+FROM base b
+JOIN fc05_pe_only p
+  ON p.app_key = b.app_key;
