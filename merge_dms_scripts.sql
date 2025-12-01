@@ -18,14 +18,14 @@ WHEN MATCHED THEN
         tgt.AmountLimit             = src.AmountLimit,
         tgt.DecisionType            = src.DecisionType,
         tgt.WarrantyLimit           = src.WarrantyLimit,
-        tgt.AdjournmentId           = src.AdjournmentId,
+        -- tgt.AdjournmentId        = src.AdjournmentId,   -- ❌ removed to avoid FK issues
         tgt.AerasLevel              = src.AerasLevel,
         tgt.IsActiveTabLevel        = src.IsActiveTabLevel,
         tgt.TabLevel                = src.TabLevel,
         tgt.ModificationDate        = SYSDATETIME()
 WHEN NOT MATCHED BY TARGET THEN
     INSERT (
-        Id,              -- ✅ now we explicitly insert Id
+        Id,
         CreationDate,
         ModificationDate,
         RiskType,
@@ -41,15 +41,15 @@ WHEN NOT MATCHED BY TARGET THEN
         AmountLimit,
         DecisionType,
         WarrantyLimit,
-        AdjournmentId,
+        -- AdjournmentId,    -- ❌ not inserted; stays NULL
         AerasLevel,
         IsActiveTabLevel,
         TabLevel
     )
     VALUES (
-        COALESCE(src.Id, NEWID()),   -- ✅ keep Id from CSV if present, else generate one
-        SYSDATETIME(),               -- CreationDate
-        SYSDATETIME(),               -- ModificationDate
+        COALESCE(src.Id, NEWID()),
+        SYSDATETIME(),
+        SYSDATETIME(),
         src.RiskType,
         src.DecisionStatus,
         src.HasAmountLimit,
@@ -63,12 +63,11 @@ WHEN NOT MATCHED BY TARGET THEN
         src.AmountLimit,
         src.DecisionType,
         src.WarrantyLimit,
-        src.AdjournmentId,
+        -- NULL,             -- implicit, because we omitted AdjournmentId
         src.AerasLevel,
         src.IsActiveTabLevel,
         src.TabLevel
     );
-
 
 -- Coverage Exclusions
 
