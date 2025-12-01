@@ -1,0 +1,3 @@
+TRUNCATE TABLE sch_DMSDECISIONS.temp_DecisionsCsv;
+TRUNCATE TABLE sch_DMSDECISIONS.temp_CoverageExclusionsCsv;
+TRUNCATE TABLE sch_DMSDECISIONS.temp_CoveragePremiumsCsv;
