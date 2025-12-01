@@ -1,8 +1,28 @@
--- Decisions
+/* ============================================================
+   STEP 0 – Clear yesterday’s staging data
+   (Run this BEFORE importing today's CSVs)
+   ============================================================ */
+TRUNCATE TABLE sch_DMSDECISIONS.temp_DecisionsCsv;
+TRUNCATE TABLE sch_DMSDECISIONS.temp_CoverageExclusionsCsv;
+TRUNCATE TABLE sch_DMSDECISIONS.temp_CoveragePremiumsCsv;
 
+/*
+    >>> NOW, IN INTELLIJ:
+        - Import Decisions.csv into sch_DMSDECISIONS.temp_DecisionsCsv
+        - Import CoverageExclusions.csv into sch_DMSDECISIONS.temp_CoverageExclusionsCsv
+        - Import CoveragePremiums.csv into sch_DMSDECISIONS.temp_CoveragePremiumsCsv
+*/
+
+
+/* ============================================================
+   STEP 1 – MERGE Decisions
+   - Updates existing Decisions by Id
+   - Inserts new Decisions where Id not present
+   - DOES NOT touch OptionId or AdjournmentId (avoids FK issues)
+   ============================================================ */
 MERGE sch_DMSDECISIONS.Decisions AS tgt
 USING sch_DMSDECISIONS.temp_DecisionsCsv AS src
-    ON tgt.Id = src.Id
+      ON tgt.Id = src.Id
 WHEN MATCHED THEN
     UPDATE SET
         tgt.RiskType                = src.RiskType,
@@ -14,11 +34,11 @@ WHEN MATCHED THEN
         tgt.HasWarrantyLimit        = src.HasWarrantyLimit,
         tgt.LoanId                  = src.LoanId,
         tgt.CoverageId              = src.CoverageId,
-        tgt.OptionId                = src.OptionId,
+        -- tgt.OptionId             = src.OptionId,        -- intentionally not updated
         tgt.AmountLimit             = src.AmountLimit,
         tgt.DecisionType            = src.DecisionType,
         tgt.WarrantyLimit           = src.WarrantyLimit,
-        -- tgt.AdjournmentId        = src.AdjournmentId,   -- ❌ removed to avoid FK issues
+        -- tgt.AdjournmentId        = src.AdjournmentId,   -- intentionally not updated
         tgt.AerasLevel              = src.AerasLevel,
         tgt.IsActiveTabLevel        = src.IsActiveTabLevel,
         tgt.TabLevel                = src.TabLevel,
@@ -37,11 +57,11 @@ WHEN NOT MATCHED BY TARGET THEN
         HasWarrantyLimit,
         LoanId,
         CoverageId,
-        OptionId,
+        -- OptionId,                -- intentionally not inserted
         AmountLimit,
         DecisionType,
         WarrantyLimit,
-        -- AdjournmentId,    -- ❌ not inserted; stays NULL
+        -- AdjournmentId,           -- intentionally not inserted
         AerasLevel,
         IsActiveTabLevel,
         TabLevel
@@ -59,21 +79,26 @@ WHEN NOT MATCHED BY TARGET THEN
         src.HasWarrantyLimit,
         src.LoanId,
         src.CoverageId,
-        src.OptionId,
+        -- NULL,
         src.AmountLimit,
         src.DecisionType,
         src.WarrantyLimit,
-        -- NULL,             -- implicit, because we omitted AdjournmentId
+        -- NULL,
         src.AerasLevel,
         src.IsActiveTabLevel,
         src.TabLevel
     );
+GO
 
--- Coverage Exclusions
 
+/* ============================================================
+   STEP 2 – MERGE CoverageExclusions
+   - Inserts / updates rows based on Id
+   - Generates Id when missing using NEWID()
+   ============================================================ */
 MERGE sch_DMSDECISIONS.CoverageExclusions AS tgt
 USING sch_DMSDECISIONS.temp_CoverageExclusionsCsv AS src
-    ON tgt.Id = src.Id
+      ON tgt.Id = src.Id
 WHEN MATCHED THEN
     UPDATE SET
         tgt.ExclusionType    = src.ExclusionType,
@@ -86,7 +111,7 @@ WHEN MATCHED THEN
         tgt.ModificationDate = SYSDATETIME()
 WHEN NOT MATCHED BY TARGET THEN
     INSERT (
-        Id,              -- ✅ explicit
+        Id,
         CreationDate,
         ModificationDate,
         ExclusionType,
@@ -98,7 +123,7 @@ WHEN NOT MATCHED BY TARGET THEN
         RowIndex
     )
     VALUES (
-        COALESCE(src.Id, NEWID()),   -- all your CSV Ids are blank → generates new GUIDs
+        COALESCE(src.Id, NEWID()),
         SYSDATETIME(),
         SYSDATETIME(),
         src.ExclusionType,
@@ -109,13 +134,17 @@ WHEN NOT MATCHED BY TARGET THEN
         src.AuthorId,
         src.RowIndex
     );
+GO
 
 
--- Coverage Premiums
-
+/* ============================================================
+   STEP 3 – MERGE CoveragePremiums
+   - Inserts / updates rows based on Id
+   - Generates Id when missing using NEWID()
+   ============================================================ */
 MERGE sch_DMSDECISIONS.CoveragePremiums AS tgt
 USING sch_DMSDECISIONS.temp_CoveragePremiumsCsv AS src
-    ON tgt.Id = src.Id
+      ON tgt.Id = src.Id
 WHEN MATCHED THEN
     UPDATE SET
         tgt.LinkType         = src.LinkType,
@@ -130,7 +159,7 @@ WHEN MATCHED THEN
         tgt.ModificationDate = SYSDATETIME()
 WHEN NOT MATCHED BY TARGET THEN
     INSERT (
-        Id,              -- ✅ explicit
+        Id,
         CreationDate,
         ModificationDate,
         LinkType,
@@ -157,3 +186,24 @@ WHEN NOT MATCHED BY TARGET THEN
         src.AuthorId,
         src.RowIndex
     );
+GO
+
+
+/* ============================================================
+   STEP 4 – Quick sanity check (optional)
+   Recently touched rows in last 5 minutes
+   ============================================================ */
+SELECT COUNT(*) AS Decisions_Touched_5min
+FROM sch_DMSDECISIONS.Decisions
+WHERE ModificationDate > DATEADD(MINUTE, -5, SYSDATETIME())
+   OR CreationDate     > DATEADD(MINUTE, -5, SYSDATETIME());
+
+SELECT COUNT(*) AS Exclusions_Touched_5min
+FROM sch_DMSDECISIONS.CoverageExclusions
+WHERE ModificationDate > DATEADD(MINUTE, -5, SYSDATETIME())
+   OR CreationDate     > DATEADD(MINUTE, -5, SYSDATETIME());
+
+SELECT COUNT(*) AS Premiums_Touched_5min
+FROM sch_DMSDECISIONS.CoveragePremiums
+WHERE ModificationDate > DATEADD(MINUTE, -5, SYSDATETIME())
+   OR CreationDate     > DATEADD(MINUTE, -5, SYSDATETIME());
