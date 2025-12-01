@@ -1,4 +1,4 @@
--- Merge Decisions
+-- Decisions
 
 MERGE sch_DMSDECISIONS.Decisions AS tgt
 USING sch_DMSDECISIONS.temp_DecisionsCsv AS src
@@ -25,6 +25,7 @@ WHEN MATCHED THEN
         tgt.ModificationDate        = SYSDATETIME()
 WHEN NOT MATCHED BY TARGET THEN
     INSERT (
+        Id,              -- ✅ now we explicitly insert Id
         CreationDate,
         ModificationDate,
         RiskType,
@@ -46,8 +47,9 @@ WHEN NOT MATCHED BY TARGET THEN
         TabLevel
     )
     VALUES (
-        SYSDATETIME(),
-        SYSDATETIME(),
+        COALESCE(src.Id, NEWID()),   -- ✅ keep Id from CSV if present, else generate one
+        SYSDATETIME(),               -- CreationDate
+        SYSDATETIME(),               -- ModificationDate
         src.RiskType,
         src.DecisionStatus,
         src.HasAmountLimit,
@@ -68,8 +70,7 @@ WHEN NOT MATCHED BY TARGET THEN
     );
 
 
-
---Coverage Exclusions
+-- Coverage Exclusions
 
 MERGE sch_DMSDECISIONS.CoverageExclusions AS tgt
 USING sch_DMSDECISIONS.temp_CoverageExclusionsCsv AS src
@@ -86,6 +87,7 @@ WHEN MATCHED THEN
         tgt.ModificationDate = SYSDATETIME()
 WHEN NOT MATCHED BY TARGET THEN
     INSERT (
+        Id,              -- ✅ explicit
         CreationDate,
         ModificationDate,
         ExclusionType,
@@ -97,6 +99,7 @@ WHEN NOT MATCHED BY TARGET THEN
         RowIndex
     )
     VALUES (
+        COALESCE(src.Id, NEWID()),   -- all your CSV Ids are blank → generates new GUIDs
         SYSDATETIME(),
         SYSDATETIME(),
         src.ExclusionType,
@@ -128,6 +131,7 @@ WHEN MATCHED THEN
         tgt.ModificationDate = SYSDATETIME()
 WHEN NOT MATCHED BY TARGET THEN
     INSERT (
+        Id,              -- ✅ explicit
         CreationDate,
         ModificationDate,
         LinkType,
@@ -141,6 +145,7 @@ WHEN NOT MATCHED BY TARGET THEN
         RowIndex
     )
     VALUES (
+        COALESCE(src.Id, NEWID()),
         SYSDATETIME(),
         SYSDATETIME(),
         src.LinkType,
