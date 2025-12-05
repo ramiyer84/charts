@@ -19,30 +19,49 @@ TRUNCATE TABLE sch_DMSDECISIONS.temp_CoveragePremiumsCsv;
    - Updates existing Decisions by Id
    - Inserts new Decisions where Id not present
    - DOES NOT touch OptionId or AdjournmentId (avoids FK issues)
-   ============================================================ */
+   */
+
 MERGE sch_DMSDECISIONS.Decisions AS tgt
-USING sch_DMSDECISIONS.temp_DecisionsCsv AS src
-      ON tgt.Id = src.Id
+USING (
+    SELECT 
+        src.*,
+        CASE 
+            WHEN src.AdjournmentId IS NOT NULL 
+                 AND EXISTS (SELECT 1 FROM sch_DMSDECISIONS.Adjournments a WHERE a.Id = src.AdjournmentId)
+            THEN src.AdjournmentId 
+            ELSE NULL 
+        END AS ValidAdjournmentId,
+
+        CASE 
+            WHEN src.OptionId IS NOT NULL
+                 AND EXISTS (SELECT 1 FROM sch_DMSDECISIONS.Options o WHERE o.Id = src.OptionId)
+            THEN src.OptionId
+            ELSE NULL
+        END AS ValidOptionId
+    FROM sch_DMSDECISIONS.temp_DecisionsCsv src
+) AS vsrc
+ON tgt.Id = vsrc.Id
 WHEN MATCHED THEN
     UPDATE SET
-        tgt.RiskType                = src.RiskType,
-        tgt.DecisionStatus          = src.DecisionStatus,
-        tgt.HasAmountLimit          = src.HasAmountLimit,
-        tgt.HasContractualExclusion = src.HasContractualExclusion,
-        tgt.HasExtrapremium         = src.HasExtrapremium,
-        tgt.HasPartialExclusion     = src.HasPartialExclusion,
-        tgt.HasWarrantyLimit        = src.HasWarrantyLimit,
-        tgt.LoanId                  = src.LoanId,
-        tgt.CoverageId              = src.CoverageId,
-        -- tgt.OptionId             = src.OptionId,        -- intentionally not updated
-        tgt.AmountLimit             = src.AmountLimit,
-        tgt.DecisionType            = src.DecisionType,
-        tgt.WarrantyLimit           = src.WarrantyLimit,
-        -- tgt.AdjournmentId        = src.AdjournmentId,   -- intentionally not updated
-        tgt.AerasLevel              = src.AerasLevel,
-        tgt.IsActiveTabLevel        = src.IsActiveTabLevel,
-        tgt.TabLevel                = src.TabLevel,
+        tgt.RiskType                = vsrc.RiskType,
+        tgt.DecisionStatus          = vsrc.DecisionStatus,
+        tgt.HasAmountLimit          = vsrc.HasAmountLimit,
+        tgt.HasContractualExclusion = vsrc.HasContractualExclusion,
+        tgt.HasExtrapremium         = vsrc.HasExtrapremium,
+        tgt.HasPartialExclusion     = vsrc.HasPartialExclusion,
+        tgt.HasWarrantyLimit        = vsrc.HasWarrantyLimit,
+        tgt.LoanId                  = vsrc.LoanId,
+        tgt.CoverageId              = vsrc.CoverageId,
+        tgt.OptionId                = vsrc.ValidOptionId,        -- NEW
+        tgt.AmountLimit             = vsrc.AmountLimit,
+        tgt.DecisionType            = vsrc.DecisionType,
+        tgt.WarrantyLimit           = vsrc.WarrantyLimit,
+        tgt.AdjournmentId           = vsrc.ValidAdjournmentId,   -- NEW
+        tgt.AerasLevel              = vsrc.AerasLevel,
+        tgt.IsActiveTabLevel        = vsrc.IsActiveTabLevel,
+        tgt.TabLevel                = vsrc.TabLevel,
         tgt.ModificationDate        = SYSDATETIME()
+
 WHEN NOT MATCHED BY TARGET THEN
     INSERT (
         Id,
@@ -57,39 +76,38 @@ WHEN NOT MATCHED BY TARGET THEN
         HasWarrantyLimit,
         LoanId,
         CoverageId,
-        -- OptionId,                -- intentionally not inserted
+        OptionId,
         AmountLimit,
         DecisionType,
         WarrantyLimit,
-        -- AdjournmentId,           -- intentionally not inserted
+        AdjournmentId,
         AerasLevel,
         IsActiveTabLevel,
         TabLevel
     )
     VALUES (
-        COALESCE(src.Id, NEWID()),
+        COALESCE(vsrc.Id, NEWID()),
         SYSDATETIME(),
         SYSDATETIME(),
-        src.RiskType,
-        src.DecisionStatus,
-        src.HasAmountLimit,
-        src.HasContractualExclusion,
-        src.HasExtrapremium,
-        src.HasPartialExclusion,
-        src.HasWarrantyLimit,
-        src.LoanId,
-        src.CoverageId,
-        -- NULL,
-        src.AmountLimit,
-        src.DecisionType,
-        src.WarrantyLimit,
-        -- NULL,
-        src.AerasLevel,
-        src.IsActiveTabLevel,
-        src.TabLevel
+        vsrc.RiskType,
+        vsrc.DecisionStatus,
+        vsrc.HasAmountLimit,
+        vsrc.HasContractualExclusion,
+        vsrc.HasExtrapremium,
+        vsrc.HasPartialExclusion,
+        vsrc.HasWarrantyLimit,
+        vsrc.LoanId,
+        vsrc.CoverageId,
+        vsrc.ValidOptionId,        -- NEW
+        vsrc.AmountLimit,
+        vsrc.DecisionType,
+        vsrc.WarrantyLimit,
+        vsrc.ValidAdjournmentId,   -- NEW
+        vsrc.AerasLevel,
+        vsrc.IsActiveTabLevel,
+        vsrc.TabLevel
     );
 GO
-
 
 /* ============================================================
    STEP 2 – MERGE CoverageExclusions
