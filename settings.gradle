@@ -2,30 +2,30 @@ pluginManagement {
     repositories {
         mavenLocal()
 
-        // 1) Repo that contains the plugin marker you found in JFrog
         maven {
             url = uri("https://artifactory.europe.axa-cloud.com/artifactory/ext-plugins-gradle-org-m2-cache/")
             credentials {
                 username = providers.gradleProperty("artifactoryUsername").orNull
                 password = providers.gradleProperty("artifactoryPassword").orNull
             }
+            metadataSources {
+                mavenPom()
+                artifact()
+                ignoreGradleMetadataRedirection()
+            }
         }
 
-        // 2) Your existing virtual Maven repo (keep it)
         maven {
-            val repoUrl = providers.gradleProperty("artifactoryUrl").orNull
-            val repoPath = providers.gradleProperty("artifactoryVirtualPath").orNull
-
-            if (repoUrl != null && repoPath != null) {
-                url = uri("$repoUrl/$repoPath/")
-            }
-
+            url = uri("https://artifactory.europe.axa-cloud.com/artifactory/virtual_axa-assist_clp-digitalapps-maven/")
             credentials {
                 username = providers.gradleProperty("artifactoryUsername").orNull
                 password = providers.gradleProperty("artifactoryPassword").orNull
             }
-
-            isAllowInsecureProtocol = true
+            metadataSources {
+                mavenPom()
+                artifact()
+                ignoreGradleMetadataRedirection()
+            }
         }
     }
 }
