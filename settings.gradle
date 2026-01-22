@@ -1,0 +1,23 @@
+pluginManagement {
+    repositories {
+        mavenLocal()
+
+        maven {
+            val repoUrl = providers.gradleProperty("artifactoryUrl").orNull
+            val repoPath = providers.gradleProperty("artifactoryVirtualPath").orNull
+
+            if (repoUrl != null && repoPath != null) {
+                url = uri("$repoUrl/$repoPath/")
+            }
+
+            credentials {
+                username = providers.gradleProperty("artifactoryUsername").orNull
+                password = providers.gradleProperty("artifactoryPassword").orNull
+            }
+
+            isAllowInsecureProtocol = true
+        }
+    }
+}
+
+rootProject.name = "console"
